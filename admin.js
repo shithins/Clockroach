@@ -1,9 +1,19 @@
+let authToken = null;
+let spreadsheetId = null;
+let userEmail = null;
+let currentReportEntries = [];
+let sortField = 'date';
+let sortAscending = false;
+
 const $ = id => document.getElementById(id);
 
-// ---------- STATE ----------
-let currentReportEntries = [];
-let sortField = null;
-let sortAscending = true;
+const HEADERS = {
+  Employees: ['employee_id', 'email', 'name', 'department', 'role', 'active'],
+  Departments: ['department_id', 'department_name'],
+  Projects: ['project_id', 'project_name', 'department', 'active'],
+  TaskPresets: ['task_id', 'task_name', 'department', 'active'],
+  TimeEntries: ['entry_id', 'employee_email', 'project_id', 'project_name', 'department', 'task_description', 'start_time', 'end_time', 'duration_minutes']
+};
 
 // ---------- THEME WORK ----------
 async function initTheme() {
@@ -33,54 +43,84 @@ $('themeToggleBtn').addEventListener('click', async () => {
   updateThemeIcon(isLight);
 });
 
-// ---------- TAB SWITCHING ----------
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    tab.classList.add('active');
-    $('tab-' + tab.dataset.tab).classList.add('active');
+// ---------- INITIALIZATION ----------
+async function init() {
+  await initTheme();
+  
+  try {
+    // 1. Get token
+    authToken = await GoogleAPI.getAuthToken(true);
+    
+    // 2. Fetch profile email
+    const profile = await fetchUserProfile(authToken);
+    userEmail = profile.email;
+    
+    // 3. Discover spreadsheet ID
+    spreadsheetId = await GoogleAPI.findSpreadsheet(authToken);
+    if (!spreadsheetId) {
+      alert('Spreadsheet not found. Please open the Extension popup first to generate the tracker.');
+      return;
+    }
+
+    // 4. Verify Admin Role
+    const employees = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
+    const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && (e.active === 'TRUE' || e.active === true));
+    
+    if (!emp || emp.role !== 'admin') {
+      document.body.innerHTML = `
+        <div class="container" style="text-align: center; margin-top: 100px;">
+          <h2>Access Denied</h2>
+          <p>You must be registered as an "admin" in the Employees sheet to view this dashboard.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // 5. Initial Refresh
+    await Promise.all([
+      refreshDepartments(),
+      refreshEmployees(),
+      refreshProjects(),
+      refreshTasks()
+    ]);
+
+    await populateFilterDropdowns();
+  } catch (err) {
+    alert(`Failed to load Admin Dashboard: ${err.message}`);
+  }
+}
+
+async function fetchUserProfile(token) {
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error('Failed to load Google profile.');
+  return await res.json();
+}
+
+// ---------- TABS NAVIGATION ----------
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    
+    t.classList.add('active');
+    $(t.dataset.tab ? `tab-${t.dataset.tab}` : '').classList.add('active');
   });
 });
 
-// ---------- INIT ----------
-async function init() {
-  await initTheme();
-  await refreshDepartments();
-  await refreshEmployees();
-  await refreshProjects();
-  await refreshTasks();
-  await populateFilterDropdowns();
-}
-
-// ---------- DURATION HELPERS (HH:MM:SS) ----------
-function getEntryDurationSeconds(e) {
-  if (!e.start_time || !e.end_time) return 0;
-  const start = new Date(e.start_time);
-  const end = new Date(e.end_time);
-  const diffMs = end - start;
-  return Math.max(0, Math.floor(diffMs / 1000));
-}
-
-function formatSecondsToHMS(totalSeconds) {
-  const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-  const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-  const s = String(totalSeconds % 60).padStart(2, '0');
-  return `${h}:${m}:${s}`;
-}
-
 // ---------- DEPARTMENTS ----------
 async function refreshDepartments() {
-  const depts = await apiCall('getDepartments');
+  const depts = await GoogleAPI.listAll(spreadsheetId, authToken, 'Departments');
   
-  // Update dropdown options
+  // Update UI dropdowns
   const options = depts.map(d => `<option value="${d.department_name}">${d.department_name}</option>`).join('');
   $('empDept').innerHTML = options;
   $('taskDept').innerHTML = options;
   
-  // Dynamically populate multi-select checkbox list for adding projects
+  // Update Project checklist
   const deptCheckboxes = depts.map(d => `
-    <label style="display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; font-weight: normal; text-transform: none; color: var(--text-primary);">
+    <label style="display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; font-weight: normal; text-transform: none;">
       <input type="checkbox" name="projDeptCheck" value="${d.department_name}" style="width: auto;">
       <span>${d.department_name}</span>
     </label>
@@ -98,25 +138,46 @@ async function refreshDepartments() {
 $('addDeptBtn').addEventListener('click', async () => {
   const name = $('deptName').value.trim();
   if (!name) return;
-  await apiCall('addDepartment', { department_name: name });
-  $('deptName').value = '';
-  await refreshDepartments();
-  await populateFilterDropdowns();
+  
+  const newId = Math.random().toString(36).substring(2, 10);
+  
+  $('addDeptBtn').disabled = true;
+  try {
+    await GoogleAPI.appendRow(spreadsheetId, authToken, 'Departments', HEADERS.Departments, {
+      department_id: newId,
+      department_name: name
+    });
+    $('deptName').value = '';
+    await refreshDepartments();
+    await populateFilterDropdowns();
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('addDeptBtn').disabled = false;
+  }
 });
 
 async function removeDept(id) {
-  if (confirm('Are you sure you want to delete this department? This won\'t delete linked entries, but may affect filters.')) {
-    await apiCall('removeDepartment', { department_id: id });
-    await refreshDepartments();
-    await populateFilterDropdowns();
+  if (confirm("Are you sure you want to delete this department? This won't delete linked entries, but may affect filters.")) {
+    try {
+      const depts = await GoogleAPI.listAll(spreadsheetId, authToken, 'Departments');
+      const matched = depts.find(d => d.department_id === id);
+      if (matched) {
+        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'Departments', matched._rowNum);
+        await refreshDepartments();
+        await populateFilterDropdowns();
+      }
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
   }
 }
 
 // ---------- EMPLOYEES ----------
 async function refreshEmployees() {
-  const emps = await apiCall('listEmployees');
+  const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
   $('employeesTable').querySelector('tbody').innerHTML = emps.map(e => {
-    const active = String(e.active) === 'true' || e.active === true;
+    const active = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
     const statusText = active ? 'Active' : 'Inactive';
     const toggleText = active ? 'Deactivate' : 'Activate';
     const statusClass = active ? 'status-active' : 'status-inactive';
@@ -138,41 +199,72 @@ async function refreshEmployees() {
 }
 
 async function toggleEmpActive(id, activeState) {
-  await apiCall('updateEmployee', { employee_id: id, active: activeState });
-  await refreshEmployees();
-  populateFilterDropdowns();
+  try {
+    const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
+    const matched = emps.find(e => e.employee_id === id);
+    if (matched) {
+      const updated = {
+        ...matched,
+        active: activeState
+      };
+      await GoogleAPI.updateRow(spreadsheetId, authToken, 'Employees', HEADERS.Employees, matched._rowNum, updated);
+      await refreshEmployees();
+      populateFilterDropdowns();
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  }
 }
 
 $('addEmpBtn').addEventListener('click', async () => {
   const email = $('empEmail').value.trim();
   const name = $('empName').value.trim();
   if (!email || !name) { alert('Email and name are required.'); return; }
-  await apiCall('addEmployee', {
-    email,
-    name,
-    department: $('empDept').value,
-    role: $('empRole').value,
-    active: true
-  });
-  $('empEmail').value = '';
-  $('empName').value = '';
-  await refreshEmployees();
-  populateFilterDropdowns();
+  
+  const newId = Math.random().toString(36).substring(2, 10);
+  
+  $('addEmpBtn').disabled = true;
+  try {
+    await GoogleAPI.appendRow(spreadsheetId, authToken, 'Employees', HEADERS.Employees, {
+      employee_id: newId,
+      email: email,
+      name: name,
+      department: $('empDept').value,
+      role: $('empRole').value,
+      active: true
+    });
+    $('empEmail').value = '';
+    $('empName').value = '';
+    await refreshEmployees();
+    populateFilterDropdowns();
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('addEmpBtn').disabled = false;
+  }
 });
 
 async function removeEmp(id) {
   if (confirm('Delete this employee record permanently from the database?')) {
-    await apiCall('removeEmployee', { employee_id: id });
-    await refreshEmployees();
-    populateFilterDropdowns();
+    try {
+      const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
+      const matched = emps.find(e => e.employee_id === id);
+      if (matched) {
+        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'Employees', matched._rowNum);
+        await refreshEmployees();
+        populateFilterDropdowns();
+      }
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
   }
 }
 
 // ---------- PROJECTS ----------
 async function refreshProjects() {
-  const projects = await apiCall('listProjects');
+  const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
   $('projectsTable').querySelector('tbody').innerHTML = projects.map(p => {
-    const active = String(p.active) === 'true' || p.active === true;
+    const active = String(p.active) === 'TRUE' || p.active === 'true' || p.active === true;
     const statusText = active ? 'Active' : 'Inactive';
     const toggleText = active ? 'Deactivate' : 'Activate';
     const statusClass = active ? 'status-active' : 'status-inactive';
@@ -192,47 +284,75 @@ async function refreshProjects() {
 }
 
 async function toggleProjActive(id, activeState) {
-  await apiCall('updateProject', { project_id: id, active: activeState });
-  await refreshProjects();
-  populateFilterDropdowns();
+  try {
+    const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
+    const matched = projects.find(p => p.project_id === id);
+    if (matched) {
+      const updated = {
+        ...matched,
+        active: activeState
+      };
+      await GoogleAPI.updateRow(spreadsheetId, authToken, 'Projects', HEADERS.Projects, matched._rowNum, updated);
+      await refreshProjects();
+      populateFilterDropdowns();
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  }
 }
 
 $('addProjBtn').addEventListener('click', async () => {
   const name = $('projName').value.trim();
   if (!name) return;
   
-  // Extract all selected departments checked
   const checkedDepts = Array.from($('projDeptsContainer').querySelectorAll('input[name="projDeptCheck"]:checked')).map(cb => cb.value);
   if (checkedDepts.length === 0) {
     alert('Please select at least one department for the project.');
     return;
   }
 
-  await apiCall('addProject', {
-    project_name: name,
-    department: checkedDepts.join(', '), // Save as comma-separated list
-    active: true
-  });
+  const newId = Math.random().toString(36).substring(2, 10);
   
-  $('projName').value = '';
-  // Uncheck all departments
-  $('projDeptsContainer').querySelectorAll('input[name="projDeptCheck"]').forEach(cb => cb.checked = false);
-  
-  await refreshProjects();
-  populateFilterDropdowns();
+  $('addProjBtn').disabled = true;
+  try {
+    await GoogleAPI.appendRow(spreadsheetId, authToken, 'Projects', HEADERS.Projects, {
+      project_id: newId,
+      project_name: name,
+      department: checkedDepts.join(', '),
+      active: true
+    });
+    
+    $('projName').value = '';
+    $('projDeptsContainer').querySelectorAll('input[name="projDeptCheck"]').forEach(cb => cb.checked = false);
+    
+    await refreshProjects();
+    populateFilterDropdowns();
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('addProjBtn').disabled = false;
+  }
 });
 
 async function removeProj(id) {
   if (confirm('Delete this project permanently from the database?')) {
-    await apiCall('removeProject', { project_id: id });
-    await refreshProjects();
-    populateFilterDropdowns();
+    try {
+      const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
+      const matched = projects.find(p => p.project_id === id);
+      if (matched) {
+        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'Projects', matched._rowNum);
+        await refreshProjects();
+        populateFilterDropdowns();
+      }
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
   }
 }
 
 // ---------- TASK PRESETS ----------
 async function refreshTasks() {
-  const tasks = await apiCall('listTaskPresets');
+  const tasks = await GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets');
   $('tasksTable').querySelector('tbody').innerHTML = tasks.map(t => `
     <tr>
       <td>${t.task_name}</td>
@@ -245,31 +365,48 @@ async function refreshTasks() {
 $('addTaskBtn').addEventListener('click', async () => {
   const name = $('taskName').value.trim();
   if (!name) return;
-  await apiCall('addTaskPreset', {
-    task_name: name,
-    department: $('taskDept').value,
-    active: true
-  });
-  $('taskName').value = '';
-  await refreshTasks();
+  
+  const newId = Math.random().toString(36).substring(2, 10);
+  
+  $('addTaskBtn').disabled = true;
+  try {
+    await GoogleAPI.appendRow(spreadsheetId, authToken, 'TaskPresets', HEADERS.TaskPresets, {
+      task_id: newId,
+      task_name: name,
+      department: $('taskDept').value,
+      active: true
+    });
+    $('taskName').value = '';
+    await refreshTasks();
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('addTaskBtn').disabled = false;
+  }
 });
 
 async function removeTask(id) {
   if (confirm('Delete this task preset?')) {
-    await apiCall('removeTaskPreset', { task_id: id });
-    await refreshTasks();
+    try {
+      const tasks = await GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets');
+      const matched = tasks.find(t => t.task_id === id);
+      if (matched) {
+        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'TaskPresets', matched._rowNum);
+        await refreshTasks();
+      }
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
   }
 }
 
 // ---------- REPORTS ----------
 async function populateFilterDropdowns() {
-  const emps = await apiCall('listEmployees');
+  const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
   $('filterEmployee').innerHTML = '<option value="">All employees</option>' +
     emps.map(e => `<option value="${e.email}">${e.name} (${e.email})</option>`).join('');
 
-  const projects = await apiCall('listProjects');
-  
-  // Populate the project multi-select dropdown menu
+  const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
   const dropdown = $('projectSelectDropdown');
   dropdown.innerHTML = projects.map(p => `
     <label class="multiselect-option">
@@ -279,7 +416,7 @@ async function populateFilterDropdowns() {
   `).join('');
   $('projectSelectTrigger').textContent = 'All projects';
 
-  const depts = await apiCall('getDepartments');
+  const depts = await GoogleAPI.listAll(spreadsheetId, authToken, 'Departments');
   $('filterDepartment').innerHTML = '<option value="">All departments</option>' +
     depts.map(d => `<option value="${d.department_name}">${d.department_name}</option>`).join('');
 }
@@ -293,14 +430,13 @@ $('projectSelectTrigger').addEventListener('click', (e) => {
 });
 
 $('projectSelectDropdown').addEventListener('click', (e) => {
-  e.stopPropagation(); // Avoid closing trigger when clicking options
+  e.stopPropagation();
 });
 
 document.addEventListener('click', () => {
   $('projectSelectDropdown').style.display = 'none';
 });
 
-// Update multiselect trigger button label dynamically on selection changes
 $('projectSelectDropdown').addEventListener('change', () => {
   const checked = Array.from($('projectSelectDropdown').querySelectorAll('input[name="filterProjectCheck"]:checked'));
   if (checked.length === 0) {
@@ -315,137 +451,151 @@ $('projectSelectDropdown').addEventListener('change', () => {
 $('runReportBtn').addEventListener('click', runReport);
 
 async function runReport() {
-  // Collect all checked projects
   const checkedProjects = Array.from($('projectSelectDropdown').querySelectorAll('input[name="filterProjectCheck"]:checked')).map(cb => cb.value);
-  
-  const params = {
-    employee_email: $('filterEmployee').value,
-    project_id: checkedProjects.join(','),
-    department: $('filterDepartment').value,
-    start_date: $('filterStart').value,
-    end_date: $('filterEnd').value
-  };
+  const filterEmployee = $('filterEmployee').value;
+  const filterDepartment = $('filterDepartment').value;
+  const filterStart = $('filterStart').value;
+  const filterEnd = $('filterEnd').value;
   
   $('totalHoursLabel').textContent = 'Loading Report...';
-  const report = await apiCall('getReport', params);
-
-  // Set global state
-  currentReportEntries = report.entries || [];
   
-  // Toggle summary view visibility
-  $('summaryCard').style.display = 'block';
-  $('detailCard').style.display = 'block';
-  
-  if (currentReportEntries.length > 0) {
-    $('exportCsvBtn').style.display = 'inline-flex';
-  } else {
-    $('exportCsvBtn').style.display = 'none';
-  }
-
-  // Calculate precise duration totals in seconds on client side
-  const totalSeconds = currentReportEntries.reduce((sum, e) => sum + getEntryDurationSeconds(e), 0);
-  $('totalHoursLabel').textContent = `Total: ${formatSecondsToHMS(totalSeconds)}`;
-
-  // Group seconds by employee
-  const employeeSeconds = {};
-  currentReportEntries.forEach(e => {
-    employeeSeconds[e.employee_email] = (employeeSeconds[e.employee_email] || 0) + getEntryDurationSeconds(e);
-  });
-
-  // Render By Employee table in HH:MM:SS
-  $('byEmployeeTable').querySelector('tbody').innerHTML = Object.entries(employeeSeconds)
-    .map(([email, secs]) => `<tr><td>${email}</td><td><strong>${formatSecondsToHMS(secs)}</strong></td></tr>`).join('');
-
-  // Group seconds by project
-  const projectSeconds = {};
-  const projectContributors = {}; // project_name -> { email -> seconds }
-  
-  currentReportEntries.forEach(e => {
-    // Project totals
-    projectSeconds[e.project_name] = (projectSeconds[e.project_name] || 0) + getEntryDurationSeconds(e);
+  try {
+    // 1. Fetch completed entries
+    const allEntries = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
+    let entries = allEntries.filter(e => e.end_time); // completed only
     
-    // Contributor breakdown
-    if (!projectContributors[e.project_name]) {
-      projectContributors[e.project_name] = {};
+    // 2. Apply filters client-side
+    if (filterEmployee) {
+      entries = entries.filter(e => e.employee_email.toLowerCase() === filterEmployee.toLowerCase());
     }
-    projectContributors[e.project_name][e.employee_email] = 
-      (projectContributors[e.project_name][e.employee_email] || 0) + getEntryDurationSeconds(e);
-  });
+    if (checkedProjects.length > 0) {
+      entries = entries.filter(e => checkedProjects.includes(e.project_id));
+    }
+    if (filterDepartment) {
+      entries = entries.filter(e => e.department.toLowerCase() === filterDepartment.toLowerCase());
+    }
+    if (filterStart) {
+      const start = new Date(filterStart);
+      entries = entries.filter(e => new Date(e.start_time) >= start);
+    }
+    if (filterEnd) {
+      const end = new Date(filterEnd);
+      end.setHours(23, 59, 59, 999);
+      entries = entries.filter(e => new Date(e.start_time) <= end);
+    }
+    
+    currentReportEntries = entries;
+    
+    $('summaryCard').style.display = 'block';
+    $('detailCard').style.display = 'block';
+    
+    if (currentReportEntries.length > 0) {
+      $('exportCsvBtn').style.display = 'inline-flex';
+    } else {
+      $('exportCsvBtn').style.display = 'none';
+    }
 
-  // Render By Project table with contributors nested in HH:MM:SS
-  let projectHtml = '';
-  if (Object.keys(projectSeconds).length === 0) {
-    projectHtml = '<tr><td colspan="2" class="status">No projects tracked in this range.</td></tr>';
-  } else {
-    Object.entries(projectSeconds).forEach(([project, secs]) => {
-      projectHtml += `
-        <tr>
-          <td style="font-weight: 600; color: var(--text-primary);">${project}</td>
-          <td><strong>${formatSecondsToHMS(secs)}</strong></td>
-        </tr>
-      `;
-      // Contributors nesting
-      const contribs = projectContributors[project];
-      if (contribs && Object.keys(contribs).length > 0) {
+    const totalSeconds = currentReportEntries.reduce((sum, e) => sum + getEntryDurationSeconds(e), 0);
+    $('totalHoursLabel').textContent = `Total: ${formatSecondsToHMS(totalSeconds)}`;
+
+    // Group by employee
+    const employeeSeconds = {};
+    currentReportEntries.forEach(e => {
+      employeeSeconds[e.employee_email] = (employeeSeconds[e.employee_email] || 0) + getEntryDurationSeconds(e);
+    });
+
+    $('byEmployeeTable').querySelector('tbody').innerHTML = Object.entries(employeeSeconds)
+      .map(([email, secs]) => `<tr><td>${email}</td><td><strong>${formatSecondsToHMS(secs)}</strong></td></tr>`).join('');
+
+    // Group by project & contributors
+    const projectSeconds = {};
+    const projectContributors = {};
+    
+    currentReportEntries.forEach(e => {
+      projectSeconds[e.project_name] = (projectSeconds[e.project_name] || 0) + getEntryDurationSeconds(e);
+      
+      if (!projectContributors[e.project_name]) {
+        projectContributors[e.project_name] = {};
+      }
+      projectContributors[e.project_name][e.employee_email] = 
+        (projectContributors[e.project_name][e.employee_email] || 0) + getEntryDurationSeconds(e);
+    });
+
+    let projectHtml = '';
+    if (Object.keys(projectSeconds).length === 0) {
+      projectHtml = '<tr><td colspan="2" class="status">No projects tracked in this range.</td></tr>';
+    } else {
+      Object.entries(projectSeconds).forEach(([project, secs]) => {
         projectHtml += `
-          <tr class="contributor-row">
-            <td colspan="2">
-              <ul class="contributor-list">
-        `;
-        Object.entries(contribs).forEach(([email, cSecs]) => {
-          projectHtml += `
-            <li class="contributor-item">
-              <span>${email}</span>
-              <span><strong>${formatSecondsToHMS(cSecs)}</strong></span>
-            </li>
-          `;
-        });
-        projectHtml += `
-              </ul>
-            </td>
+          <tr>
+            <td style="font-weight: 600; color: var(--text-primary);">${project}</td>
+            <td><strong>${formatSecondsToHMS(secs)}</strong></td>
           </tr>
         `;
-      }
-    });
-  }
-  $('byProjectTable').querySelector('tbody').innerHTML = projectHtml;
-
-  // Render Employee x Project breakdown (Daily details) if both filters are populated
-  if (params.employee_email && checkedProjects.length === 1) {
-    $('employeeProjectBreakdownBox').style.display = 'block';
-    $('breakdownIndicator').style.display = 'inline-flex';
-    
-    const dailyGroup = {}; // date_string -> { seconds: X, tasks: Set }
-    currentReportEntries.forEach(e => {
-      const dateStr = new Date(e.start_time).toLocaleDateString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric'
+        const contribs = projectContributors[project];
+        if (contribs && Object.keys(contribs).length > 0) {
+          projectHtml += `
+            <tr class="contributor-row">
+              <td colspan="2">
+                <ul class="contributor-list">
+          `;
+          Object.entries(contribs).forEach(([email, cSecs]) => {
+            projectHtml += `
+              <li class="contributor-item">
+                <span>${email}</span>
+                <span><strong>${formatSecondsToHMS(cSecs)}</strong></span>
+              </li>
+            `;
+          });
+          projectHtml += `
+                </ul>
+              </td>
+            </tr>
+          `;
+        }
       });
-      if (!dailyGroup[dateStr]) {
-        dailyGroup[dateStr] = { seconds: 0, tasks: new Set() };
-      }
-      dailyGroup[dateStr].seconds += getEntryDurationSeconds(e);
-      if (e.task_description) {
-        dailyGroup[dateStr].tasks.add(e.task_description);
-      }
-    });
-    
-    const breakdownRows = Object.entries(dailyGroup).map(([date, data]) => `
-      <tr>
-        <td>${date}</td>
-        <td><strong>${formatSecondsToHMS(data.seconds)}</strong></td>
-        <td>${Array.from(data.tasks).join(', ') || '—'}</td>
-      </tr>
-    `).join('');
-    
-    $('employeeProjectBreakdownTable').querySelector('tbody').innerHTML = 
-      breakdownRows || '<tr><td colspan="3" class="status">No recorded time matches.</td></tr>';
-  } else {
-    $('employeeProjectBreakdownBox').style.display = 'none';
-    $('breakdownIndicator').style.display = 'none';
-  }
+    }
+    $('byProjectTable').querySelector('tbody').innerHTML = projectHtml;
 
-  // Render detailed entries log
-  renderDetailTable(currentReportEntries);
+    // Daily breakdown
+    if (filterEmployee && checkedProjects.length === 1) {
+      $('employeeProjectBreakdownBox').style.display = 'block';
+      $('breakdownIndicator').style.display = 'inline-flex';
+      
+      const dailyGroup = {};
+      currentReportEntries.forEach(e => {
+        const dateStr = new Date(e.start_time).toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric'
+        });
+        if (!dailyGroup[dateStr]) {
+          dailyGroup[dateStr] = { seconds: 0, tasks: new Set() };
+        }
+        dailyGroup[dateStr].seconds += getEntryDurationSeconds(e);
+        if (e.task_description) {
+          dailyGroup[dateStr].tasks.add(e.task_description);
+        }
+      });
+      
+      const breakdownRows = Object.entries(dailyGroup).map(([date, data]) => `
+        <tr>
+          <td>${date}</td>
+          <td><strong>${formatSecondsToHMS(data.seconds)}</strong></td>
+          <td>${Array.from(data.tasks).join(', ') || '—'}</td>
+        </tr>
+      `).join('');
+      
+      $('employeeProjectBreakdownTable').querySelector('tbody').innerHTML = 
+        breakdownRows || '<tr><td colspan="3" class="status">No recorded time matches.</td></tr>';
+    } else {
+      $('employeeProjectBreakdownBox').style.display = 'none';
+      $('breakdownIndicator').style.display = 'none';
+    }
+
+    renderDetailTable(currentReportEntries);
+  } catch (err) {
+    alert(`Failed to compile report: ${err.message}`);
+    $('totalHoursLabel').textContent = 'Error compiling report.';
+  }
 }
 
 // ---------- SORTING ----------
@@ -500,7 +650,6 @@ document.querySelectorAll('#detailTable th.sortable').forEach(th => {
       sortAscending = true;
     }
     
-    // Visual header sorting indicators
     document.querySelectorAll('#detailTable th.sortable').forEach(h => {
       h.textContent = h.textContent.replace(/ ▲| ▼/g, '');
     });
@@ -542,6 +691,19 @@ $('exportCsvBtn').addEventListener('click', () => {
   document.body.removeChild(link);
 });
 
+// ---------- HELPERS ----------
+function getEntryDurationSeconds(e) {
+  if (!e.end_time) return 0;
+  return Math.round((new Date(e.end_time) - new Date(e.start_time)) / 1000);
+}
+
+function formatSecondsToHMS(secs) {
+  const h = String(Math.floor(secs / 3600)).padStart(2, '0');
+  const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+  const s = String(secs % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
 // ---------- QUICK PRESETS ----------
 $('quickToday').addEventListener('click', () => {
   const now = new Date();
@@ -567,9 +729,6 @@ $('quickMonth').addEventListener('click', () => {
   $('filterEnd').value = now.toISOString().slice(0, 10);
   runReport();
 });
-
-// ---------- EXECUTION ----------
-init();
 
 // ---------- EVENT DELEGATION FOR TABLES ----------
 $('departmentsTable').querySelector('tbody').addEventListener('click', async (e) => {
@@ -613,3 +772,5 @@ $('tasksTable').querySelector('tbody').addEventListener('click', async (e) => {
     await removeTask(id);
   }
 });
+
+init();
