@@ -5,7 +5,7 @@
   "description": "Clockroach internal time tracking — timer, tasks, and admin reports.",
   "permissions": ["storage", "identity", "alarms", "notifications"],
   "oauth2": {
-    "client_id": "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com",
+    "client_id": "258793295529-6tmpbm80l6g85pt68j2d06g07efib1qp.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/spreadsheets",
       "https://www.googleapis.com/auth/drive.file"
