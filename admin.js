@@ -90,7 +90,7 @@ async function refreshDepartments() {
   $('departmentsTable').querySelector('tbody').innerHTML = depts.map(d => `
     <tr>
       <td style="font-weight: 500;">${d.department_name}</td>
-      <td><button class="btn-secondary btn-delete" onclick="removeDept('${d.department_id}')">Delete</button></td>
+      <td><button class="btn-secondary btn-delete" data-id="${d.department_id}">Delete</button></td>
     </tr>
   `).join('');
 }
@@ -104,13 +104,13 @@ $('addDeptBtn').addEventListener('click', async () => {
   await populateFilterDropdowns();
 });
 
-window.removeDept = async function(id) {
+async function removeDept(id) {
   if (confirm('Are you sure you want to delete this department? This won\'t delete linked entries, but may affect filters.')) {
     await apiCall('removeDepartment', { department_id: id });
     await refreshDepartments();
     await populateFilterDropdowns();
   }
-};
+}
 
 // ---------- EMPLOYEES ----------
 async function refreshEmployees() {
@@ -129,19 +129,19 @@ async function refreshEmployees() {
         <td><span class="badge" style="background-color: var(--bg-tertiary);">${e.role}</span></td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>
-          <button class="btn-secondary ${toggleBtnClass}" onclick="toggleEmpActive('${e.employee_id}', ${!active})">${toggleText}</button>
-          <button class="btn-secondary btn-delete" onclick="removeEmp('${e.employee_id}')">Delete</button>
+          <button class="btn-secondary ${toggleBtnClass}" data-id="${e.employee_id}" data-active="${!active}">${toggleText}</button>
+          <button class="btn-secondary btn-delete" data-id="${e.employee_id}">Delete</button>
         </td>
       </tr>
     `;
   }).join('');
 }
 
-window.toggleEmpActive = async function(id, activeState) {
+async function toggleEmpActive(id, activeState) {
   await apiCall('updateEmployee', { employee_id: id, active: activeState });
   await refreshEmployees();
   populateFilterDropdowns();
-};
+}
 
 $('addEmpBtn').addEventListener('click', async () => {
   const email = $('empEmail').value.trim();
@@ -160,13 +160,13 @@ $('addEmpBtn').addEventListener('click', async () => {
   populateFilterDropdowns();
 });
 
-window.removeEmp = async function(id) {
+async function removeEmp(id) {
   if (confirm('Delete this employee record permanently from the database?')) {
     await apiCall('removeEmployee', { employee_id: id });
     await refreshEmployees();
     populateFilterDropdowns();
   }
-};
+}
 
 // ---------- PROJECTS ----------
 async function refreshProjects() {
@@ -183,19 +183,19 @@ async function refreshProjects() {
         <td>${p.department}</td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>
-          <button class="btn-secondary ${toggleBtnClass}" onclick="toggleProjActive('${p.project_id}', ${!active})">${toggleText}</button>
-          <button class="btn-secondary btn-delete" onclick="removeProj('${p.project_id}')">Delete</button>
+          <button class="btn-secondary ${toggleBtnClass}" data-id="${p.project_id}" data-active="${!active}">${toggleText}</button>
+          <button class="btn-secondary btn-delete" data-id="${p.project_id}">Delete</button>
         </td>
       </tr>
     `;
   }).join('');
 }
 
-window.toggleProjActive = async function(id, activeState) {
+async function toggleProjActive(id, activeState) {
   await apiCall('updateProject', { project_id: id, active: activeState });
   await refreshProjects();
   populateFilterDropdowns();
-};
+}
 
 $('addProjBtn').addEventListener('click', async () => {
   const name = $('projName').value.trim();
@@ -222,13 +222,13 @@ $('addProjBtn').addEventListener('click', async () => {
   populateFilterDropdowns();
 });
 
-window.removeProj = async function(id) {
+async function removeProj(id) {
   if (confirm('Delete this project permanently from the database?')) {
     await apiCall('removeProject', { project_id: id });
     await refreshProjects();
     populateFilterDropdowns();
   }
-};
+}
 
 // ---------- TASK PRESETS ----------
 async function refreshTasks() {
@@ -237,7 +237,7 @@ async function refreshTasks() {
     <tr>
       <td>${t.task_name}</td>
       <td>${t.department}</td>
-      <td><button class="btn-secondary btn-delete" onclick="removeTask('${t.task_id}')">Delete</button></td>
+      <td><button class="btn-secondary btn-delete" data-id="${t.task_id}">Delete</button></td>
     </tr>
   `).join('');
 }
@@ -254,12 +254,12 @@ $('addTaskBtn').addEventListener('click', async () => {
   await refreshTasks();
 });
 
-window.removeTask = async function(id) {
+async function removeTask(id) {
   if (confirm('Delete this task preset?')) {
     await apiCall('removeTaskPreset', { task_id: id });
     await refreshTasks();
   }
-};
+}
 
 // ---------- REPORTS ----------
 async function populateFilterDropdowns() {
@@ -570,3 +570,46 @@ $('quickMonth').addEventListener('click', () => {
 
 // ---------- EXECUTION ----------
 init();
+
+// ---------- EVENT DELEGATION FOR TABLES ----------
+$('departmentsTable').querySelector('tbody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains('btn-delete')) {
+    await removeDept(id);
+  }
+});
+
+$('employeesTable').querySelector('tbody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains('btn-delete')) {
+    await removeEmp(id);
+  } else if (btn.classList.contains('btn-activate') || btn.classList.contains('btn-deactivate')) {
+    const activeState = btn.dataset.active === 'true';
+    await toggleEmpActive(id, activeState);
+  }
+});
+
+$('projectsTable').querySelector('tbody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains('btn-delete')) {
+    await removeProj(id);
+  } else if (btn.classList.contains('btn-activate') || btn.classList.contains('btn-deactivate')) {
+    const activeState = btn.dataset.active === 'true';
+    await toggleProjActive(id, activeState);
+  }
+});
+
+$('tasksTable').querySelector('tbody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains('btn-delete')) {
+    await removeTask(id);
+  }
+});
