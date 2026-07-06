@@ -116,6 +116,11 @@ async function loginWithToken(token) {
     $('loadingState').style.display = 'none';
     $('mainView').style.display = 'block';
 
+    // Show direct Sheet and Guide links
+    $('sheetLink').href = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+    $('sheetLink').style.display = 'inline-block';
+    $('guideLink').style.display = 'inline-block';
+
     if (emp.role === 'admin') {
       $('adminLink').style.display = 'block';
     } else {
@@ -318,6 +323,10 @@ document.head.appendChild(spinStyle);
 
 $('adminLink').addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('admin.html') });
+});
+
+$('guideLink').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('guide.html') });
 });
 
 $('logoutLink').addEventListener('click', async () => {

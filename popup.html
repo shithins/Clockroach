@@ -49,8 +49,15 @@
     </div>
 
     <!-- Greeting block -->
-    <div id="greeting" class="status" style="display:none; text-align: left; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;"></div>
-
+    <div class="greeting-row">
+      <div id="greeting" style="display:none;"></div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <a id="guideLink" style="display:none;" title="How to use Clockroach">Guide</a>
+        <a id="sheetLink" target="_blank" style="display:none;" title="Open Google Sheet">Google Sheet</a>
+        <a id="adminLink" style="display:none;">Admin Panel</a>
+        <a id="logoutLink" style="color: var(--text-secondary);">Logout</a>
+      </div>
+    </div>
     <div id="mainView" style="display:none;">
       <!-- Tab Navigation -->
       <div id="tabContainer" class="popup-tabs">

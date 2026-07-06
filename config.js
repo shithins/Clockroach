@@ -108,10 +108,10 @@ const GoogleAPI = {
           { range: 'TimeEntries!A1:I1', values: [['entry_id', 'employee_email', 'project_id', 'project_name', 'department', 'task_description', 'start_time', 'end_time', 'duration_minutes']] },
           
           // Seed Data
-          { range: 'Employees!A2:F2', values: [['E1', userEmail || 'admin@yourcompany.com', 'Admin Owner', 'Dev', 'admin', true]] },
-          { range: 'Departments!A2:B4', values: [['D1', 'SEO'], ['D2', 'Ads'], ['D3', 'Dev']] },
-          { range: 'Projects!A2:D3', values: [['P1', 'ATDC', 'SEO, Dev', true], ['P2', 'PVS', 'SEO, Dev', true]] },
-          { range: 'TaskPresets!A2:C4', values: [['T1', 'Audit', 'SEO'], ['T2', 'Development', 'Dev'], ['T3', 'Design', 'Dev']] }
+          { range: 'Employees!A2:F2', values: [['E1', userEmail || 'admin@yourcompany.com', 'Admin Owner', 'Development', 'admin', true]] },
+          { range: 'Departments!A2:B4', values: [['D1', 'Development'], ['D2', 'Marketing'], ['D3', 'Sales']] },
+          { range: 'Projects!A2:D3', values: [['P1', 'Project Alpha', 'Development, Marketing', true], ['P2', 'Project Beta', 'Development', true]] },
+          { range: 'TaskPresets!A2:C4', values: [['T1', 'Research', 'Development'], ['T2', 'Coding', 'Development'], ['T3', 'Design', 'Development']] }
         ]
       })
     });

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clockroach — Usage & Setup Guide</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent-color: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --border-color: #334155;
+      --card-bg: #1e293b;
+      --success-color: #4ade80;
+      --error-color: #f87171;
+    }
+
+    body.light-theme {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #f1f5f9;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --accent-color: #0284c7;
+      --accent-hover: #0369a1;
+      --border-color: #e2e8f0;
+      --card-bg: #ffffff;
+      --success-color: #16a34a;
+      --error-color: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 24px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 16px;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      color: var(--accent-color);
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    ol, ul {
+      margin-left: 20px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .badge-alert {
+      background-color: rgba(248, 113, 113, 0.1);
+      color: var(--error-color);
+      border: 1px solid var(--error-color);
+    }
+
+    .badge-info {
+      background-color: rgba(56, 189, 248, 0.1);
+      color: var(--accent-color);
+      border: 1px solid var(--border-color);
+    }
+
+    code {
+      font-family: monospace;
+      background-color: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .alert-box {
+      border-left: 4px solid var(--accent-color);
+      background-color: var(--bg-tertiary);
+      padding: 16px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 18px;
+    }
+
+    .alert-box p:last-child {
+      margin-bottom: 0;
+    }
+
+    .alert-box.warning {
+      border-left-color: var(--error-color);
+      background-color: rgba(248, 113, 113, 0.05);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      border-top: 1px solid var(--border-color);
+      padding-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="logo-container">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <h1>Clockroach</h1>
+      </div>
+      <div class="subtitle">Complete Usage & Setup Guide</div>
+    </header>
+
+    <div class="card">
+      <h2>1. The Concept & Data Ownership</h2>
+      <p>Clockroach is a serverless time-tracking tool. Instead of sending your tracking data to a third-party developer's server, it writes it <strong>directly to your own personal Google Drive</strong>.</p>
+      <div class="alert-box">
+        <p><strong>🔒 Total Privacy:</strong> All logs, employee lists, and projects are written directly to your Google Sheet. No databases are shared, and no subscriptions are required.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. Setup Guides</h2>
+      
+      <h3>For the Admin (Company Owner / Manager)</h3>
+      <ol>
+        <li>Open the extension and click <strong>"Sign In with Google"</strong>.</li>
+        <li>Grant permission for sheets and file creation. Clockroach will automatically search your Google Drive.</li>
+        <li>Since this is your first time, it will automatically create a spreadsheet named <code>Clockroach Time Tracker</code> in your Google Drive.</li>
+        <li>Open the spreadsheet, go to the <strong>Employees</strong> tab, and add your team members' emails. Make sure their <code>active</code> column is set to <code>TRUE</code>.</li>
+        <li><strong>CRITICAL STEP:</strong> Right-click the spreadsheet in Google Drive, click <strong>Share</strong>, and add your employees' Google emails. Give them <strong>"Editor"</strong> permissions so the extension can write logs to the sheet on their behalf.</li>
+      </ol>
+
+      <h3>For Employees</h3>
+      <ol>
+        <li>Download the Clockroach Chrome Extension.</li>
+        <li>Click <strong>"Sign In with Google"</strong> and select your work Google account.</li>
+        <li>The extension will search your Drive for the shared <code>Clockroach Time Tracker</code> sheet, find it, verify your email is listed as an active employee, and open the tracking interface.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>3. How to Track Time</h2>
+      <p>To record your daily tasks:</p>
+      <ul>
+        <li>Select a <strong>Project</strong> from the dropdown menu (only projects assigned to your department will show up).</li>
+        <li>Type a brief description of what you are working on in the <strong>Task Description</strong> input field.</li>
+        <li>Click the green <strong>Start Timer</strong> button. The clock will begin ticking.</li>
+        <li>When you are finished or taking a break, open the extension and click the red <strong>Stop Timer</strong> button to write the entry to the spreadsheet.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>4. Editing Time Log Durations</h2>
+      <p>Sometimes employees forget to stop their timers and log incorrect durations (e.g. stopping it the next morning, showing 16 hours instead of 5).</p>
+      
+      <div class="alert-box warning">
+        <p><strong>⚠️ Editing Constraints:</strong></p>
+        <ul>
+          <li>Employees **cannot** change the start time of an entry.</li>
+          <li>Employees **can only reduce** the duration (e.g., changing 16 hours to 8 hours). You cannot add hours.</li>
+          <li>Employees can only edit their **last 4 completed entries**. Older logs are locked.</li>
+        </ul>
+      </div>
+
+      <p><strong>How to edit:</strong> Go to the <strong>Dashboard</strong> tab, scroll to your logs, click the blue **edit (pencil)** icon on any of the top 4 entries, adjust the hours/minutes, and click save.</p>
+    </div>
+
+    <div class="card">
+      <h2>5. The Admin Panel</h2>
+      <p>Admins have access to an internal dashboard directly connected to the Google Sheet. Click the **Admin Panel** link at the top of the extension popup to:</p>
+      <ul>
+        <li><strong>Departments</strong>: Create, manage, or delete organization departments.</li>
+        <li><strong>Employees</strong>: Add employee emails, assign them roles (admin/employee), and set active/inactive status.</li>
+        <li><strong>Projects & Task Presets</strong>: Assign projects to specific departments so employees only see relevant options.</li>
+        <li><strong>Time Reports</strong>: Filter hours by Employee, Project, Department, and Date. Get nested breakdown summaries and export detailed reports to a <strong>CSV file</strong> for invoicing or payroll.</li>
+      </ul>
+    </div>
+
+    <footer>
+      Clockroach Time Tracker © 2026. Data stored in your personal Google Drive.
+    </footer>
+  </div>
+
+  <script>
+    async function initTheme() {
+      const stored = await chrome.storage.local.get('theme');
+      if (stored.theme === 'light') {
+        document.body.classList.add('light-theme');
+      } else {
+        document.body.classList.remove('light-theme');
+      }
+    }
+    initTheme();
+  </script>
+</body>
+</html>
