@@ -46,34 +46,99 @@
     <div id="greeting" class="status" style="display:none; text-align: left; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;"></div>
 
     <div id="mainView" style="display:none;">
-      <!-- Timer block -->
-      <div id="timerContainer" class="timer-container" style="display:none;">
-        <div id="timerCircle" class="timer-circle">
-          <div id="timerDisplay" class="timer-display">00:00:00</div>
-        </div>
-        <div id="runningTaskLabel" class="running-task-badge"></div>
+      <!-- Tab Navigation -->
+      <div id="tabContainer" class="popup-tabs">
+        <button id="tabTracker" class="popup-tab active">Tracker</button>
+        <button id="tabDashboard" class="popup-tab">Dashboard</button>
       </div>
 
-      <!-- Start form -->
-      <div id="startForm">
-        <label>Project</label>
-        <select id="projectSelect"></select>
+      <!-- Tracker Tab View -->
+      <div id="trackerView">
+        <!-- Timer block -->
+        <div id="timerContainer" class="timer-container" style="display:none;">
+          <div id="timerCircle" class="timer-circle">
+            <div id="timerDisplay" class="timer-display">00:00:00</div>
+          </div>
+          <div id="runningTaskLabel" class="running-task-badge"></div>
+        </div>
 
-        <label>Task Description</label>
-        <input id="taskInput" list="taskSuggestions" placeholder="Type or pick a task...">
-        <datalist id="taskSuggestions"></datalist>
+        <!-- Start form -->
+        <div id="startForm">
+          <label>Project</label>
+          <select id="projectSelect"></select>
 
-        <button class="btn-start" id="startBtn" style="margin-top: 14px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-          Start Timer
+          <label>Task Description</label>
+          <input id="taskInput" list="taskSuggestions" placeholder="Type or pick a task...">
+          <datalist id="taskSuggestions"></datalist>
+
+          <button class="btn-start" id="startBtn" style="margin-top: 14px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Start Timer
+          </button>
+        </div>
+
+        <!-- Stop button -->
+        <button class="btn-stop" id="stopBtn" style="display:none; margin-top: 14px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
+          Stop Timer
         </button>
       </div>
 
-      <!-- Stop button -->
-      <button class="btn-stop" id="stopBtn" style="display:none; margin-top: 14px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
-        Stop Timer
-      </button>
+      <!-- Dashboard Tab View -->
+      <div id="dashboardView" style="display:none;">
+        <!-- Stats Summary Card -->
+        <div class="stats-summary-card">
+          <div class="stat-box">
+            <span class="stat-label">This Week</span>
+            <span id="weekHours" class="stat-value">0.00h</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-box">
+            <span class="stat-label">This Month</span>
+            <span id="monthHours" class="stat-value">0.00h</span>
+          </div>
+        </div>
+
+        <!-- Section Header with Sorting -->
+        <div class="section-header">
+          <h3>Recent Entries</h3>
+          <button id="sortBtn" class="btn-icon" title="Sort by Date">
+            <span id="sortDirectionText">Newest</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+          </button>
+        </div>
+
+        <div id="dashboardLoading" class="status" style="margin-top: 12px;">Loading dashboard data...</div>
+        <div id="entriesList" class="entries-list" style="display:none;"></div>
+      </div>
+
+      <!-- Edit Entry Modal (Overlay) -->
+      <div id="editEntryModal" class="edit-modal" style="display:none;">
+        <div class="edit-modal-content">
+          <h3>Edit Entry Duration</h3>
+          
+          <div style="font-size: 11px; margin-bottom: 12px; color: var(--text-secondary); background: var(--bg-primary); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+            <div id="editEntryInfoProject" style="font-weight: 600; color: var(--text-primary);"></div>
+            <div id="editEntryInfoTask" style="margin-top: 2px;"></div>
+            <div id="editEntryInfoOriginal" style="margin-top: 4px; color: var(--accent-rose); font-size: 10px;"></div>
+          </div>
+          
+          <label style="margin-top: 8px;">New Duration</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="number" id="editHoursInput" min="0" placeholder="0" style="flex: 1; text-align: center;">
+            <span style="font-size: 12px; color: var(--text-secondary);">hr</span>
+            <input type="number" id="editMinutesInput" min="0" max="59" placeholder="0" style="flex: 1; text-align: center;">
+            <span style="font-size: 12px; color: var(--text-secondary);">min</span>
+          </div>
+          
+          <div id="editError" class="error" style="display:none; padding: 6px 10px; margin-top: 10px; font-size: 11px;"></div>
+          
+          <div style="display: flex; gap: 8px; margin-top: 16px;">
+            <button id="saveEditBtn" class="btn-primary" style="flex: 1; padding: 8px 12px;">Save</button>
+            <button id="cancelEditBtn" class="btn-secondary" style="flex: 1; padding: 8px 12px;">Cancel</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Navigation links -->
       <div id="adminLink" class="admin-link" style="display:none;">Open Admin Panel →</div>

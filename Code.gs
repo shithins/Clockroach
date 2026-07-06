@@ -91,6 +91,8 @@ function handle(params) {
       case 'getRunningTimer': result = getRunningTimer(params.email); break;
       case 'startTimer': result = startTimer(params); break;
       case 'stopTimer': result = stopTimer(params); break;
+      case 'getEmployeeDashboardData': result = getEmployeeDashboardData(params); break;
+      case 'updateTimeEntry': result = updateTimeEntry(params); break;
 
       case 'listEmployees': result = listAll(SHEETS.EMPLOYEES); break;
       case 'addEmployee': result = addRow(SHEETS.EMPLOYEES, params); break;
@@ -247,6 +249,101 @@ function stopTimer(params) {
   sheet.getRange(rowIndex, headers.indexOf('end_time') + 1).setValue(endTime.toISOString());
   sheet.getRange(rowIndex, headers.indexOf('duration_minutes') + 1).setValue(durationMinutes);
   return { success: true, duration_minutes: durationMinutes };
+}
+
+function getEmployeeDashboardData(params) {
+  const email = params.email;
+  if (!email) return { error: 'Email is required' };
+
+  const allEntries = listAll(SHEETS.TIMEENTRIES)
+    .filter(e => e.employee_email.toLowerCase() === email.toLowerCase());
+
+  const completedEntries = allEntries.filter(e => e.end_time);
+
+  const now = new Date();
+
+  // Start of current week (Monday)
+  const startOfWeek = new Date(now);
+  const day = startOfWeek.getDay();
+  const diff = startOfWeek.getDate() - (day === 0 ? 6 : day - 1);
+  startOfWeek.setDate(diff);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // Start of current month
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  let weekMinutes = 0;
+  let monthMinutes = 0;
+
+  completedEntries.forEach(e => {
+    if (!e.start_time) return;
+    const startTime = new Date(e.start_time);
+    if (isNaN(startTime.getTime())) return;
+    const duration = Number(e.duration_minutes) || 0;
+    if (startTime >= startOfWeek) {
+      weekMinutes += duration;
+    }
+    if (startTime >= startOfMonth) {
+      monthMinutes += duration;
+    }
+  });
+
+  // Sort completed entries by start_time descending initially
+  completedEntries.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
+  return {
+    week_hours: (weekMinutes / 60).toFixed(2),
+    month_hours: (monthMinutes / 60).toFixed(2),
+    entries: completedEntries.slice(0, 50)
+  };
+}
+
+function updateTimeEntry(params) {
+  const email = params.email;
+  const entryId = params.entry_id;
+  const newDuration = Number(params.new_duration_minutes);
+
+  if (!email) return { error: 'Email is required' };
+  if (!entryId) return { error: 'Entry ID is required' };
+  if (isNaN(newDuration) || newDuration < 0) return { error: 'Invalid duration' };
+
+  // Fetch all completed entries for this employee to check if this entry is one of the last 4
+  const allEntries = listAll(SHEETS.TIMEENTRIES)
+    .filter(e => e.employee_email.toLowerCase() === email.toLowerCase() && e.end_time);
+
+  // Sort descending by start_time so latest is first
+  allEntries.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
+  const editableEntries = allEntries.slice(0, 4);
+  const originalEntry = editableEntries.find(e => e.entry_id === entryId);
+
+  if (!originalEntry) {
+    return { error: 'You can only edit your last 4 completed entries.' };
+  }
+
+  const originalDuration = Number(originalEntry.duration_minutes) || 0;
+  if (newDuration > originalDuration) {
+    return { error: 'You can only reduce the duration of an entry, not increase it.' };
+  }
+
+  const startTime = new Date(originalEntry.start_time);
+  if (isNaN(startTime.getTime())) {
+    return { error: 'Invalid start time in original entry.' };
+  }
+
+  // Recalculate end_time: start_time + newDuration minutes
+  const newEndTime = new Date(startTime.getTime() + newDuration * 60000);
+
+  const rowIndex = findRowIndex(SHEETS.TIMEENTRIES, 'entry_id', entryId);
+  if (rowIndex === -1) return { error: 'Entry not found' };
+
+  const sheet = getSheet(SHEETS.TIMEENTRIES);
+  const headers = HEADERS.TimeEntries;
+
+  sheet.getRange(rowIndex, headers.indexOf('end_time') + 1).setValue(newEndTime.toISOString());
+  sheet.getRange(rowIndex, headers.indexOf('duration_minutes') + 1).setValue(newDuration);
+
+  return { success: true };
 }
 
 function getReport(params) {

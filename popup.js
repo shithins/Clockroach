@@ -1,6 +1,10 @@
 let currentEmployee = null;
 let runningEntry = null;
 let timerInterval = null;
+let activeProjects = [];
+let dashboardEntries = [];
+let currentSortDirection = 'desc';
+let editingEntryId = null;
 
 const $ = id => document.getElementById(id);
 
@@ -91,6 +95,15 @@ async function loginWithEmail(email) {
       apiCall('getProjects', { department: currentEmployee.department }),
       apiCall('getTaskPresets', { department: currentEmployee.department })
     ]);
+
+    activeProjects = projects;
+    
+    // Reset views
+    $('trackerView').style.display = 'block';
+    $('dashboardView').style.display = 'none';
+    $('tabTracker').classList.add('active');
+    $('tabDashboard').classList.remove('active');
+    $('editEntryModal').style.display = 'none';
 
     const select = $('projectSelect');
     if (projects.length === 0) {
@@ -252,3 +265,252 @@ $('logoutLink').addEventListener('click', async () => {
 });
 
 init();
+
+// ---------- DASHBOARD & EDITING LOGIC ----------
+
+// Tab switching
+$('tabTracker').addEventListener('click', () => {
+  $('tabTracker').classList.add('active');
+  $('tabDashboard').classList.remove('active');
+  $('trackerView').style.display = 'block';
+  $('dashboardView').style.display = 'none';
+});
+
+$('tabDashboard').addEventListener('click', async () => {
+  $('tabDashboard').classList.add('active');
+  $('tabTracker').classList.remove('active');
+  $('dashboardView').style.display = 'block';
+  $('trackerView').style.display = 'none';
+  await loadDashboard();
+});
+
+// Load Dashboard Data
+async function loadDashboard() {
+  if (!currentEmployee) return;
+  
+  $('dashboardLoading').style.display = 'block';
+  $('entriesList').style.display = 'none';
+  $('editEntryModal').style.display = 'none';
+  
+  try {
+    const result = await apiCall('getEmployeeDashboardData', { email: currentEmployee.email });
+    if (result.error) {
+      $('dashboardLoading').textContent = `Error: ${result.error}`;
+      return;
+    }
+    
+    // Display stats
+    $('weekHours').textContent = `${result.week_hours}h`;
+    $('monthHours').textContent = `${result.month_hours}h`;
+    
+    dashboardEntries = result.entries || [];
+    
+    $('dashboardLoading').style.display = 'none';
+    $('entriesList').style.display = 'flex';
+    
+    renderDashboardEntries();
+  } catch (err) {
+    $('dashboardLoading').textContent = `Network error: ${err.message}`;
+  }
+}
+
+// Render entries
+function renderDashboardEntries() {
+  const container = $('entriesList');
+  container.innerHTML = '';
+  
+  if (dashboardEntries.length === 0) {
+    container.innerHTML = '<div class="status" style="margin-top: 20px;">No completed time entries.</div>';
+    return;
+  }
+  
+  // Sort entries client-side based on currentSortDirection
+  const sorted = [...dashboardEntries].sort((a, b) => {
+    const dateA = new Date(a.start_time);
+    const dateB = new Date(b.start_time);
+    return currentSortDirection === 'desc' ? dateB - dateA : dateA - dateB;
+  });
+  
+  // Find IDs of the last 4 completed entries (always chronologically latest)
+  // By sorting descending by start_time first, we find the 4 latest completed entries
+  const latestCompleted4Ids = [...dashboardEntries]
+    .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+    .slice(0, 4)
+    .map(e => e.entry_id);
+    
+  sorted.forEach(entry => {
+    const item = document.createElement('div');
+    item.className = 'entry-item';
+    
+    const isEditable = latestCompleted4Ids.includes(entry.entry_id);
+    
+    // Format Date: e.g. "Mon, Jul 6"
+    const startDate = new Date(entry.start_time);
+    const dateStr = startDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    
+    // Format Time: e.g. "10:15 AM - 11:30 AM"
+    const startTimeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let endTimeStr = 'Running';
+    if (entry.end_time) {
+      endTimeStr = new Date(entry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // Format Duration: e.g. "1h 15m" or "45m"
+    const mins = Number(entry.duration_minutes) || 0;
+    const hrs = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    const durationStr = hrs > 0 ? `${hrs}h ${remMins}m` : `${remMins}m`;
+    
+    item.innerHTML = `
+      <div class="entry-item-header">
+        <div style="flex: 1; min-width: 0;">
+          <div class="entry-task" title="${escapeHtml(entry.task_description)}">${escapeHtml(entry.task_description || '(No description)')}</div>
+          <div class="entry-project">${escapeHtml(entry.project_name || 'No Project')}</div>
+        </div>
+        ${isEditable ? `
+          <button class="entry-edit-btn" data-id="${entry.entry_id}" title="Edit Duration">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </button>
+        ` : ''}
+      </div>
+      <div class="entry-meta">
+        <span>${dateStr} • ${startTimeStr} - ${endTimeStr}</span>
+        <span style="font-weight: 600; color: var(--text-primary);">${durationStr}</span>
+      </div>
+    `;
+    
+    // Wire up the edit button event listener
+    if (isEditable) {
+      item.querySelector('.entry-edit-btn').addEventListener('click', () => {
+        openEditModal(entry);
+      });
+    }
+    
+    container.appendChild(item);
+  });
+}
+
+// Sort button handler
+$('sortBtn').addEventListener('click', () => {
+  currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+  $('sortDirectionText').textContent = currentSortDirection === 'desc' ? 'Newest' : 'Oldest';
+  
+  // Rotate/flip the sorting SVG arrow icon indicator
+  const svg = $('sortBtn').querySelector('svg');
+  if (currentSortDirection === 'desc') {
+    svg.style.transform = 'none';
+  } else {
+    svg.style.transform = 'rotate(180deg)';
+  }
+  
+  renderDashboardEntries();
+});
+
+// Edit modal opening
+function openEditModal(entry) {
+  editingEntryId = entry.entry_id;
+  $('editError').style.display = 'none';
+  
+  $('editEntryInfoProject').textContent = entry.project_name || 'No Project';
+  $('editEntryInfoTask').textContent = entry.task_description || '(No description)';
+  
+  const origMins = Number(entry.duration_minutes) || 0;
+  const origH = Math.floor(origMins / 60);
+  const origM = origMins % 60;
+  
+  $('editEntryInfoOriginal').textContent = `Original Duration: ${origH}h ${origM}m (Max allowed)`;
+  
+  $('editHoursInput').value = origH;
+  $('editMinutesInput').value = origM;
+  
+  // Set dataset attributes for validation
+  $('editEntryModal').dataset.originalMinutes = origMins;
+  
+  $('editEntryModal').style.display = 'flex';
+}
+
+// Close modal handlers
+$('cancelEditBtn').addEventListener('click', () => {
+  $('editEntryModal').style.display = 'none';
+  editingEntryId = null;
+});
+
+// Save edits handler
+$('saveEditBtn').addEventListener('click', async () => {
+  if (!editingEntryId) return;
+  
+  $('editError').style.display = 'none';
+  
+  const originalMinutes = Number($('editEntryModal').dataset.originalMinutes) || 0;
+  const newHours = parseInt($('editHoursInput').value || 0, 10);
+  const newMinutesVal = parseInt($('editMinutesInput').value || 0, 10);
+  
+  if (isNaN(newHours) || newHours < 0 || isNaN(newMinutesVal) || newMinutesVal < 0 || newMinutesVal > 59) {
+    showEditError('Please enter valid hours and minutes (0-59).');
+    return;
+  }
+  
+  const newMinutes = newHours * 60 + newMinutesVal;
+  
+  if (newMinutes > originalMinutes) {
+    const origH = Math.floor(originalMinutes / 60);
+    const origM = originalMinutes % 60;
+    showEditError(`Duration cannot exceed the original duration of ${origH}h ${origM}m.`);
+    return;
+  }
+  
+  if (newMinutes === originalMinutes) {
+    // No changes, close modal directly
+    $('editEntryModal').style.display = 'none';
+    editingEntryId = null;
+    return;
+  }
+  
+  // Optimistic UI saving state
+  $('saveEditBtn').disabled = true;
+  const originalBtnText = $('saveEditBtn').innerHTML;
+  $('saveEditBtn').innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation: spin 1s linear infinite; margin-right: 4px;"><circle cx="12" cy="12" r="10"></circle></svg> Saving...`;
+  
+  try {
+    const result = await apiCall('updateTimeEntry', {
+      email: currentEmployee.email,
+      entry_id: editingEntryId,
+      new_duration_minutes: newMinutes
+    });
+    
+    $('saveEditBtn').disabled = false;
+    $('saveEditBtn').innerHTML = originalBtnText;
+    
+    if (result.error) {
+      showEditError(result.error);
+      return;
+    }
+    
+    // Close modal and refresh dashboard
+    $('editEntryModal').style.display = 'none';
+    editingEntryId = null;
+    await loadDashboard();
+  } catch (err) {
+    $('saveEditBtn').disabled = false;
+    $('saveEditBtn').innerHTML = originalBtnText;
+    showEditError(`Error updating duration: ${err.message}`);
+  }
+});
+
+function showEditError(msg) {
+  $('editError').textContent = msg;
+  $('editError').style.display = 'block';
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
