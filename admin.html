@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Clockroach — Admin Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="admin-layout">
+      <!-- SIDEBAR NAV -->
+      <div class="sidebar">
+        <!-- Brand Header with Toggle -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+              <!-- Antennas -->
+              <path d="M7 6C6 3 9 2 12 5" stroke="var(--accent-indigo)" />
+              <path d="M17 6C18 3 15 2 12 5" stroke="var(--accent-indigo)" />
+              <!-- Shell -->
+              <circle cx="12" cy="13" r="6" />
+              <polyline points="12 10 12 13 14 14" />
+              <!-- Legs -->
+              <line x1="6" y1="11" x2="4" y2="10" />
+              <line x1="6" y1="13" x2="4" y2="13" />
+              <line x1="6" y1="15" x2="4" y2="16" />
+              <line x1="18" y1="11" x2="20" y2="10" />
+              <line x1="18" y1="13" x2="20" y2="13" />
+              <line x1="18" y1="15" x2="20" y2="16" />
+            </svg>
+            <h1 style="font-size: 19px; font-weight: 800; background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-indigo) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">Clockroach</h1>
+          </div>
+          <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Light/Dark Theme">
+            <svg id="themeToggleIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </button>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" data-tab="reports">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            Reports & Analytics
+          </div>
+          <div class="tab" data-tab="employees">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            Employees
+          </div>
+          <div class="tab" data-tab="projects">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line><line x1="12" y1="17" x2="12" y2="21"></line><line x1="8" y1="21" x2="16" y2="21"></line></svg>
+            Projects
+          </div>
+          <div class="tab" data-tab="departments">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            Departments
+          </div>
+          <div class="tab" data-tab="tasks">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Task Presets
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN CONTENT PANEL -->
+      <div class="main-content">
+        
+        <!-- REPORTS & ANALYTICS -->
+        <div class="tab-content active" id="tab-reports">
+          <div class="card">
+            <h2 style="font-size: 18px; margin-bottom: 16px; color: var(--text-primary);">Filter Hour Reports</h2>
+            
+            <div class="row">
+              <div>
+                <label>Employee</label>
+                <select id="filterEmployee"><option value="">All employees</option></select>
+              </div>
+              <div>
+                <label>Projects (Multiple Select)</label>
+                <div class="multiselect-container">
+                  <div class="multiselect-trigger" id="projectSelectTrigger">All projects</div>
+                  <div class="multiselect-dropdown" id="projectSelectDropdown" style="display: none;"></div>
+                </div>
+              </div>
+              <div>
+                <label>Department</label>
+                <select id="filterDepartment"><option value="">All departments</option></select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label>Start Date</label>
+                <input type="date" id="filterStart">
+              </div>
+              <div>
+                <label>End Date</label>
+                <input type="date" id="filterEnd">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;">
+              <button class="btn-primary" id="runReportBtn">Run Report</button>
+              <button class="btn-secondary" id="quickToday">Today</button>
+              <button class="btn-secondary" id="quickWeek">This Week</button>
+              <button class="btn-secondary" id="quickMonth">This Month</button>
+              <button class="btn-secondary" id="exportCsvBtn" style="display: none; background-color: var(--accent-emerald);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          <!-- SUMMARY OVERVIEW STATS -->
+          <div class="card" id="summaryCard" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+              <h2 id="totalHoursLabel" style="font-size: 22px; font-weight: 700; color: var(--accent-emerald); margin: 0;">Total: 0.00 hours</h2>
+              <div id="breakdownIndicator" class="badge status-active" style="display: none;">Employee × Project Breakdown Active</div>
+            </div>
+
+            <!-- Employee × Project Day-by-Day Summary -->
+            <div id="employeeProjectBreakdownBox" style="display: none; margin-bottom: 24px;">
+              <h2 style="color: var(--accent-indigo);">Daily Hour Breakdown</h2>
+              <table id="employeeProjectBreakdownTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Hours</th>
+                    <th>Tasks Completed</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <div class="report-grid">
+              <div>
+                <h2>By Employee</h2>
+                <table id="byEmployeeTable">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Hours Contribution</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              
+              <div>
+                <h2>By Project & Contributors</h2>
+                <table id="byProjectTable">
+                  <thead>
+                    <tr>
+                      <th>Project</th>
+                      <th>Total Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- DETAILED TIME LOGS -->
+          <div class="card" id="detailCard" style="display: none;">
+            <h2 style="font-size: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">Detailed Time Log Entries</h2>
+            <table id="detailTable">
+              <thead>
+                <tr>
+                  <th class="sortable" data-sort="employee">Employee</th>
+                  <th class="sortable" data-sort="project">Project</th>
+                  <th class="sortable" data-sort="department">Department</th>
+                  <th>Task Description</th>
+                  <th class="sortable" data-sort="date">Date & Time</th>
+                  <th class="sortable" data-sort="duration">Duration</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- EMPLOYEES -->
+        <div class="tab-content" id="tab-employees">
+          <div class="card">
+            <h2>Add New Employee</h2>
+            <div class="row">
+              <div><label>Email Address</label><input id="empEmail" placeholder="e.g. employee@company.com"></div>
+              <div><label>Full Name</label><input id="empName" placeholder="e.g. John Doe"></div>
+            </div>
+            <div class="row">
+              <div><label>Department</label><select id="empDept"></select></div>
+              <div><label>Role</label><select id="empRole"><option value="employee">Employee</option><option value="admin">Admin</option></select></div>
+            </div>
+            <button class="btn-primary" id="addEmpBtn" style="margin-top: 8px;">Add Employee</button>
+          </div>
+          
+          <div class="card">
+            <h2>Registered Employees</h2>
+            <table id="employeesTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Department</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PROJECTS -->
+        <div class="tab-content" id="tab-projects">
+          <div class="card">
+            <h2>Add New Project</h2>
+            <div class="row">
+              <div><label>Project Name</label><input id="projName" placeholder="e.g. Project Apollo"></div>
+              <div>
+                <label>Assigned Departments (Multiple Selection)</label>
+                <div id="projDeptsContainer" style="border: 1px solid var(--border-color); border-radius: 8px; max-height: 120px; overflow-y: auto; padding: 10px; background: var(--bg-secondary);">
+                  <!-- Checkboxes populated dynamically -->
+                </div>
+              </div>
+            </div>
+            <button class="btn-primary" id="addProjBtn" style="margin-top: 14px;">Add Project</button>
+          </div>
+          
+          <div class="card">
+            <h2>Tracked Projects</h2>
+            <table id="projectsTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- DEPARTMENTS -->
+        <div class="tab-content" id="tab-departments">
+          <div class="card">
+            <h2>Add New Department</h2>
+            <div class="row" style="align-items: flex-end;">
+              <div style="flex: 2;"><label>Department Name</label><input id="deptName" placeholder="e.g. Engineering"></div>
+              <div style="flex: 1;"><button class="btn-primary" id="addDeptBtn" style="width: 100%; margin-top: 0;">Add Department</button></div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <h2>Registered Departments</h2>
+            <table id="departmentsTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TASK PRESETS -->
+        <div class="tab-content" id="tab-tasks">
+          <div class="card">
+            <h2>Add Task Preset</h2>
+            <div class="row">
+              <div><label>Task Preset Name</label><input id="taskName" placeholder="e.g. Code Review"></div>
+              <div><label>Department Scope</label><select id="taskDept"></select></div>
+            </div>
+            <button class="btn-primary" id="addTaskBtn" style="margin-top: 8px;">Add Task Preset</button>
+          </div>
+          
+          <div class="card">
+            <h2>Active Task Presets</h2>
+            <table id="tasksTable">
+              <thead>
+                <tr>
+                  <th>Preset Task Description</th>
+                  <th>Department</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

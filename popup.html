@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="popup-body">
+  <div class="container">
+    <!-- Header with Clockroach Brand & Theme Toggle -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+          <!-- Antennas -->
+          <path d="M7 6C6 3 9 2 12 5" stroke="var(--accent-indigo)" />
+          <path d="M17 6C18 3 15 2 12 5" stroke="var(--accent-indigo)" />
+          <!-- Beetle Clock Shell -->
+          <circle cx="12" cy="13" r="6" />
+          <polyline points="12 10 12 13 14 14" />
+          <!-- Beetle/Cockroach legs -->
+          <line x1="6" y1="11" x2="4" y2="10" />
+          <line x1="6" y1="13" x2="4" y2="13" />
+          <line x1="6" y1="15" x2="4" y2="16" />
+          <line x1="18" y1="11" x2="20" y2="10" />
+          <line x1="18" y1="13" x2="20" y2="13" />
+          <line x1="18" y1="15" x2="20" y2="16" />
+        </svg>
+        <h1 style="margin: 0; font-size: 18px; font-weight: 800; background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-indigo) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Clockroach</h1>
+      </div>
+      <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Light/Dark Theme">
+        <svg id="themeToggleIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </button>
+    </div>
+
+    <div id="loadingState" class="status">Connecting to database...</div>
+    <div id="loginError" class="error" style="display:none;"></div>
+
+    <!-- Email Fallback Sign-In -->
+    <div id="emailSigninForm" style="display:none;">
+      <p class="status" style="margin-bottom: 12px; text-align: left; color: var(--text-secondary);">Enter your email to sign in:</p>
+      <label>Email Address</label>
+      <input type="email" id="signinEmail" placeholder="employee@company.com">
+      <button class="btn-primary" id="signinBtn" style="width: 100%; margin-top: 12px;">Sign In</button>
+    </div>
+
+    <!-- Greeting block -->
+    <div id="greeting" class="status" style="display:none; text-align: left; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;"></div>
+
+    <div id="mainView" style="display:none;">
+      <!-- Timer block -->
+      <div id="timerContainer" class="timer-container" style="display:none;">
+        <div id="timerCircle" class="timer-circle">
+          <div id="timerDisplay" class="timer-display">00:00:00</div>
+        </div>
+        <div id="runningTaskLabel" class="running-task-badge"></div>
+      </div>
+
+      <!-- Start form -->
+      <div id="startForm">
+        <label>Project</label>
+        <select id="projectSelect"></select>
+
+        <label>Task Description</label>
+        <input id="taskInput" list="taskSuggestions" placeholder="Type or pick a task...">
+        <datalist id="taskSuggestions"></datalist>
+
+        <button class="btn-start" id="startBtn" style="margin-top: 14px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          Start Timer
+        </button>
+      </div>
+
+      <!-- Stop button -->
+      <button class="btn-stop" id="stopBtn" style="display:none; margin-top: 14px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
+        Stop Timer
+      </button>
+
+      <!-- Navigation links -->
+      <div id="adminLink" class="admin-link" style="display:none;">Open Admin Panel →</div>
+      <div id="logoutLink" class="admin-link" style="margin-top: 8px; color: var(--text-muted); font-size: 11px;">Switch Account</div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
