@@ -913,17 +913,8 @@ body.light-theme .edit-modal {
 }
 
 #resetBackendBtn {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 24px;
-  height: 24px;
-  transition: all 0.15s ease;
+  padding: 0;
 }
 
 #resetBackendBtn:hover {

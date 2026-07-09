@@ -239,11 +239,11 @@ async function finishLoginSetup() {
   });
 
   const select = $('projectSelect');
-  if (activeProjects.length === 0) {
-    select.innerHTML = '<option value="">No projects active</option>';
-  } else {
-    select.innerHTML = activeProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
+  let selectHtml = '<option value="none">-- No Project --</option>';
+  if (activeProjects.length > 0) {
+    selectHtml += activeProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
   }
+  select.innerHTML = selectHtml;
 
   // Filter tasks presets
   const deptTasks = tasks.filter(t => {
@@ -468,7 +468,7 @@ $('supaSignupBtn').addEventListener('click', async () => {
 $('startBtn').addEventListener('click', async () => {
   const projectId = $('projectSelect').value;
   const task = $('taskInput').value.trim();
-  if (!projectId) { alert('No project selected.'); return; }
+  if (!projectId || projectId === '') { alert('No project selected.'); return; }
   if (!task) { alert('Enter task description.'); return; }
 
   $('startBtn').disabled = true;
@@ -481,8 +481,8 @@ $('startBtn').addEventListener('click', async () => {
     const newRow = {
       entry_id: entryId,
       employee_email: userEmail,
-      project_id: projectId,
-      project_name: selectedProj ? selectedProj.project_name : '',
+      project_id: projectId || 'none',
+      project_name: selectedProj ? selectedProj.project_name : 'No Project',
       department: currentEmployee.department,
       task_description: task,
       start_time: new Date().toISOString(),
