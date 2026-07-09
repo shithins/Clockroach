@@ -96,17 +96,14 @@
       <!-- Supabase Keys Configuration Form -->
       <div id="supabaseConfigForm" style="display:none; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <p class="status" style="margin: 0; color: var(--text-secondary); font-weight: 600;">Supabase Configuration:</p>
+          <p class="status" style="margin: 0; color: var(--text-secondary); font-weight: 600;">Connect Workspace</p>
           <a id="backToSignUpPanel" class="header-link" style="font-size: 11px; padding: 2px 6px; cursor: pointer;">← Back</a>
         </div>
-        <label>Supabase Project URL</label>
-        <input type="text" id="setupSupaUrl" placeholder="https://xxxx.supabase.co" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
-        
-        <label>Supabase Anon Key</label>
-        <input type="password" id="setupSupaKey" placeholder="eyJhbGciOi..." style="margin-bottom: 16px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+        <label>Workspace Invite Code</label>
+        <textarea id="supaInviteInput" placeholder="Paste the invitation code sent by your admin..." style="margin-bottom: 16px; width: 100%; height: 75px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-family: monospace; font-size: 10px; resize: none; line-height: 1.4;"></textarea>
         
         <button class="btn-primary" id="saveSupaConfigBtn" style="width: 100%;">
-          Connect to Database
+          Connect & Proceed
         </button>
       </div>
     </div>

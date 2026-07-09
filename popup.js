@@ -388,11 +388,10 @@ $('backToSignUpPanel').addEventListener('click', () => {
 });
 
 $('saveSupaConfigBtn').addEventListener('click', async () => {
-  const url = $('setupSupaUrl').value.trim();
-  const key = $('setupSupaKey').value.trim();
+  const code = $('supaInviteInput').value.trim();
 
-  if (!url || !key) {
-    alert('Please enter both Supabase URL and Anon Key.');
+  if (!code) {
+    alert('Please paste the workspace invitation code.');
     return;
   }
 
@@ -400,6 +399,20 @@ $('saveSupaConfigBtn').addEventListener('click', async () => {
   $('saveSupaConfigBtn').textContent = 'Connecting...';
 
   try {
+    let connectionData;
+    try {
+      connectionData = JSON.parse(atob(code));
+    } catch (e) {
+      throw new Error('Invalid invitation code format. Please check the code.');
+    }
+
+    const url = connectionData.url;
+    const key = connectionData.key;
+
+    if (!url || !key) {
+      throw new Error('Invitation code is missing required connection fields.');
+    }
+
     // Verify connection URL and key by hitting the Auth endpoint
     const testRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
@@ -440,7 +453,7 @@ $('saveSupaConfigBtn').addEventListener('click', async () => {
     alert(`Connection failed: ${err.message}`);
   } finally {
     $('saveSupaConfigBtn').disabled = false;
-    $('saveSupaConfigBtn').textContent = 'Connect to Database';
+    $('saveSupaConfigBtn').textContent = 'Connect & Proceed';
   }
 });
 

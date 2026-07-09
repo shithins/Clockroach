@@ -159,6 +159,23 @@ async function init() {
         alert('Session expired. Please sign in via the extension popup first.');
         return;
       }
+
+      // Generate and display workspace invite code
+      try {
+        const inviteData = { url: supabaseUrl, key: supabaseAnonKey };
+        const code = btoa(JSON.stringify(inviteData));
+        $('supaInviteCode').textContent = code;
+        $('supaInviteContainer').style.display = 'block';
+
+        $('copyInviteBtn').addEventListener('click', () => {
+          navigator.clipboard.writeText(code);
+          const btn = $('copyInviteBtn');
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = 'Copy Code'; }, 2000);
+        });
+      } catch (err) {
+        console.error('Failed to generate invite code', err);
+      }
     }
 
     // Verify user is active admin
