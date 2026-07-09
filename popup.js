@@ -313,14 +313,78 @@ function showRunningState() {
   timerInterval = setInterval(updateTimerText, 1000);
 }
 
-// ---------- BACKEND SELECTOR EVENT HANDLERS ----------
+// ---------- WELCOME VIEW / ROLE SELECTOR HANDLERS ----------
+let supaMode = 'signup'; // 'signin' or 'signup'
+
+$('goSignInBtn').addEventListener('click', () => {
+  $('roleSelectionScreen').style.display = 'none';
+  $('signInPanel').style.display = 'block';
+});
+
+$('goSignUpBtn').addEventListener('click', () => {
+  $('roleSelectionScreen').style.display = 'none';
+  $('signUpPanel').style.display = 'block';
+});
+
+document.querySelectorAll('.back-to-roles').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $('signInPanel').style.display = 'none';
+    $('signUpPanel').style.display = 'none';
+    $('supabaseConfigForm').style.display = 'none';
+    $('roleSelectionScreen').style.display = 'block';
+  });
+});
+
+$('sheetsSignInBtn').addEventListener('click', async () => {
+  $('sheetsSignInBtn').disabled = true;
+  $('sheetsSignInBtn').textContent = 'Connecting...';
+  try {
+    await chrome.storage.local.set({ backend_type: 'sheets' });
+    backendType = 'sheets';
+    
+    // Attempt Google Sheets authorization
+    const token = await GoogleAPI.getAuthToken(true);
+    authToken = token;
+    
+    // Hide setup wizard
+    $('setupView').style.display = 'none';
+    $('loadingState').style.display = 'block';
+    await loginWithSheets(token);
+  } catch (err) {
+    alert(`Google Sign-In failed: ${err.message}`);
+    // Reset selection in storage so setup opens again on reload
+    await chrome.storage.local.remove('backend_type');
+    backendType = null;
+  } finally {
+    $('sheetsSignInBtn').disabled = false;
+    $('sheetsSignInBtn').textContent = 'Sign In with Google (Sheets)';
+  }
+});
+
+$('supabaseSignInBtn').addEventListener('click', () => {
+  supaMode = 'signin';
+  $('signInPanel').style.display = 'none';
+  $('supabaseConfigForm').style.display = 'block';
+});
+
 $('selectSheetsBtn').addEventListener('click', async () => {
   await chrome.storage.local.set({ backend_type: 'sheets' });
   init();
 });
 
 $('selectSupabaseBtn').addEventListener('click', () => {
+  supaMode = 'signup';
+  $('signUpPanel').style.display = 'none';
   $('supabaseConfigForm').style.display = 'block';
+});
+
+$('backToSignUpPanel').addEventListener('click', () => {
+  $('supabaseConfigForm').style.display = 'none';
+  if (supaMode === 'signin') {
+    $('signInPanel').style.display = 'block';
+  } else {
+    $('signUpPanel').style.display = 'block';
+  }
 });
 
 $('saveSupaConfigBtn').addEventListener('click', async () => {
@@ -346,15 +410,29 @@ $('saveSupaConfigBtn').addEventListener('click', async () => {
       body: JSON.stringify({ email: 'test-connection@clockroach.com', password: 'password123' })
     });
 
-    // If we receive a status, key is correct (returns 400 because account doesn't exist).
-    // If key is wrong, it returns 401/403. If URL is wrong, it throws fetch error.
     if (testRes.status === 400 || testRes.ok) {
       await chrome.storage.local.set({
         backend_type: 'supabase',
         supabase_url: url,
         supabase_anon_key: key
       });
-      init();
+      
+      // Update variables locally
+      backendType = 'supabase';
+      supabaseUrl = url;
+      supabaseAnonKey = key;
+
+      // Hide setup panel
+      $('setupView').style.display = 'none';
+      $('loadingState').style.display = 'none';
+
+      if (supaMode === 'signin') {
+        $('supabaseSigninForm').style.display = 'block';
+        $('supabaseSignupForm').style.display = 'none';
+      } else {
+        $('supabaseSignupForm').style.display = 'block';
+        $('supabaseSigninForm').style.display = 'none';
+      }
     } else {
       throw new Error('Supabase authorization failed. Verify your URL and Anon Key.');
     }
@@ -362,7 +440,7 @@ $('saveSupaConfigBtn').addEventListener('click', async () => {
     alert(`Connection failed: ${err.message}`);
   } finally {
     $('saveSupaConfigBtn').disabled = false;
-    $('saveSupaConfigBtn').textContent = 'Connect to Supabase';
+    $('saveSupaConfigBtn').textContent = 'Connect to Database';
   }
 });
 
