@@ -798,6 +798,15 @@ $('quickToday').addEventListener('click', () => {
   runReport();
 });
 
+$('quickYesterday').addEventListener('click', () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateStr = yesterday.toISOString().slice(0, 10);
+  $('filterStart').value = dateStr;
+  $('filterEnd').value = dateStr;
+  runReport();
+});
+
 $('quickWeek').addEventListener('click', () => {
   const now = new Date();
   const start = new Date(now);
@@ -807,9 +816,43 @@ $('quickWeek').addEventListener('click', () => {
   runReport();
 });
 
+$('quickLastWeek').addEventListener('click', () => {
+  const now = new Date();
+  const day = now.getDay();
+  const mondayOfThisWeek = new Date(now);
+  mondayOfThisWeek.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  
+  const start = new Date(mondayOfThisWeek);
+  start.setDate(mondayOfThisWeek.getDate() - 7);
+  
+  const end = new Date(mondayOfThisWeek);
+  end.setDate(mondayOfThisWeek.getDate() - 1);
+  
+  $('filterStart').value = start.toISOString().slice(0, 10);
+  $('filterEnd').value = end.toISOString().slice(0, 10);
+  runReport();
+});
+
 $('quickMonth').addEventListener('click', () => {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  $('filterStart').value = start.toISOString().slice(0, 10);
+  $('filterEnd').value = now.toISOString().slice(0, 10);
+  runReport();
+});
+
+$('quickLastMonth').addEventListener('click', () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const end = new Date(now.getFullYear(), now.getMonth(), 0);
+  $('filterStart').value = start.toISOString().slice(0, 10);
+  $('filterEnd').value = end.toISOString().slice(0, 10);
+  runReport();
+});
+
+$('quickLast3Months').addEventListener('click', () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
   $('filterStart').value = start.toISOString().slice(0, 10);
   $('filterEnd').value = now.toISOString().slice(0, 10);
   runReport();
