@@ -77,6 +77,18 @@ async function init() {
 
   backendType = stored.backend_type;
 
+  // FALLBACK TO PRE-CONFIGURED DEFAULTS IN config.js IF STORAGE IS EMPTY
+  if (!backendType && typeof DEFAULT_BACKEND !== 'undefined' && DEFAULT_BACKEND) {
+    backendType = DEFAULT_BACKEND;
+    await chrome.storage.local.set({
+      backend_type: DEFAULT_BACKEND,
+      supabase_url: DEFAULT_SUPABASE_URL || '',
+      supabase_anon_key: DEFAULT_SUPABASE_ANON_KEY || ''
+    });
+    stored.supabase_url = DEFAULT_SUPABASE_URL || '';
+    stored.supabase_anon_key = DEFAULT_SUPABASE_ANON_KEY || '';
+  }
+
   if (!backendType) {
     // Show database setup selector
     $('loadingState').style.display = 'none';

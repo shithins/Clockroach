@@ -1,3 +1,9 @@
+// ---------- DEFAULT CONFIGURATION (OPTIONAL) ----------
+// Pre-configure connection details here so your employees can skip the database setup screen.
+const DEFAULT_BACKEND = ''; // Options: '', 'sheets', 'supabase'
+const DEFAULT_SUPABASE_URL = ''; // Your Supabase URL
+const DEFAULT_SUPABASE_ANON_KEY = ''; // Your Supabase Anon Key
+
 // ---------- GOOGLE API CONNECTOR LAYER ----------
 
 const GoogleAPI = {
