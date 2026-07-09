@@ -1,3 +1,8 @@
+let backendType = null;
+let supabaseUrl = null;
+let supabaseAnonKey = null;
+let supabaseToken = null;
+
 let currentEmployee = null;
 let runningEntry = null;
 let timerInterval = null;
@@ -49,132 +54,99 @@ $('themeToggleBtn').addEventListener('click', async () => {
   updateThemeIcon(isLight);
 });
 
-// ---------- AUTH & INITIALIZATION ----------
+// ---------- INITIALIZATION ROUTER ----------
 async function init() {
   await initTheme();
+  $('loadingState').style.display = 'block';
+  $('loadingState').textContent = 'Loading configurations...';
+  $('loginError').style.display = 'none';
+  $('setupView').style.display = 'none';
+  $('googleSigninForm').style.display = 'none';
+  $('supabaseSigninForm').style.display = 'none';
+  $('supabaseSignupForm').style.display = 'none';
+  $('mainView').style.display = 'none';
 
-  // Try to sign in silently first
-  try {
-    const token = await GoogleAPI.getAuthToken(false);
-    if (token) {
-      authToken = token;
-      await loginWithToken(token);
-    } else {
-      showSignInForm();
+  // Read stored database configuration
+  const stored = await chrome.storage.local.get([
+    'backend_type', 
+    'supabase_url', 
+    'supabase_anon_key', 
+    'supabase_token', 
+    'supabase_user_email'
+  ]);
+
+  backendType = stored.backend_type;
+
+  if (!backendType) {
+    // Show database setup selector
+    $('loadingState').style.display = 'none';
+    $('setupView').style.display = 'block';
+    return;
+  }
+
+  if (backendType === 'sheets') {
+    // Run Google Sheets auth flow
+    $('sheetLink').style.display = 'inline-block';
+    try {
+      const token = await GoogleAPI.getAuthToken(false);
+      if (token) {
+        authToken = token;
+        await loginWithSheets(token);
+      } else {
+        $('loadingState').style.display = 'none';
+        $('googleSigninForm').style.display = 'block';
+      }
+    } catch (err) {
+      $('loadingState').style.display = 'none';
+      $('googleSigninForm').style.display = 'block';
     }
-  } catch (err) {
-    showSignInForm();
+  } else if (backendType === 'supabase') {
+    // Run Supabase auth flow
+    $('sheetLink').style.display = 'none'; // No sheet link in Supabase mode
+    supabaseUrl = stored.supabase_url;
+    supabaseAnonKey = stored.supabase_anon_key;
+    supabaseToken = stored.supabase_token;
+    userEmail = stored.supabase_user_email;
+
+    if (supabaseToken && userEmail) {
+      await loginWithSupabase(supabaseToken, userEmail);
+    } else {
+      $('loadingState').style.display = 'none';
+      $('supabaseSigninForm').style.display = 'block';
+    }
   }
 }
 
-function showSignInForm() {
-  $('loadingState').style.display = 'none';
-  $('greeting').style.display = 'none';
-  $('mainView').style.display = 'none';
-  $('googleSigninForm').style.display = 'block';
-}
-
-async function loginWithToken(token) {
+// ---------- GOOGLE SHEETS LOGIN ----------
+async function loginWithSheets(token) {
   $('loadingState').style.display = 'block';
-  $('loadingState').textContent = 'Connecting to Google Account...';
+  $('loadingState').textContent = 'Connecting to Google Drive...';
   $('googleSigninForm').style.display = 'none';
-  $('loginError').style.display = 'none';
 
   try {
-    // 1. Fetch user profile from Google OAuth
     const profile = await fetchUserProfile(token);
     userEmail = profile.email;
-    userName = profile.name || 'User';
 
-    // 2. Discover spreadsheet
-    $('loadingState').textContent = 'Searching for Clockroach spreadsheet...';
     spreadsheetId = await GoogleAPI.findSpreadsheet(token);
-
-    // 3. Create one if it does not exist
     if (!spreadsheetId) {
-      $('loadingState').textContent = 'Creating new Clockroach spreadsheet...';
+      $('loadingState').textContent = 'Creating Clockroach spreadsheet...';
       spreadsheetId = await GoogleAPI.createSpreadsheet(token, userEmail);
     }
 
-    // 4. Read Employees sheet to verify user
-    $('loadingState').textContent = 'Verifying employee record...';
+    $('loadingState').textContent = 'Verifying employee status...';
     const employees = await GoogleAPI.listAll(spreadsheetId, token, 'Employees');
-    
-    // Check for active employee record
     const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && (e.active === 'TRUE' || e.active === true));
-    
+
     if (!emp) {
-      showError(`Access Denied: No employee record found for ${userEmail}. Ask your admin to add you to the "Employees" tab of the Google Sheet.`);
+      showError(`Access Denied: No active employee record found for ${userEmail}. Contact your sheet admin.`);
       $('googleSigninForm').style.display = 'block';
       return;
     }
 
     currentEmployee = emp;
-
-    $('greeting').textContent = `Hi, ${emp.name}`;
-    $('greeting').style.display = 'block';
-    $('loadingState').style.display = 'none';
-    $('mainView').style.display = 'block';
-
-    // Show direct Sheet and Guide links
-    $('sheetLink').href = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
-    $('sheetLink').style.display = 'inline-block';
-    $('guideLink').style.display = 'inline-block';
-
-    if (emp.role === 'admin') {
-      $('adminLink').style.display = 'block';
-    } else {
-      $('adminLink').style.display = 'none';
-    }
-
-    // Reset views to default Tracker
-    $('trackerView').style.display = 'block';
-    $('dashboardView').style.display = 'none';
-    $('tabTracker').classList.add('active');
-    $('tabDashboard').classList.remove('active');
-    $('editEntryModal').style.display = 'none';
-
-    // 5. Fetch projects and task presets
-    const [projects, tasks, timeEntries] = await Promise.all([
-      GoogleAPI.listAll(spreadsheetId, token, 'Projects'),
-      GoogleAPI.listAll(spreadsheetId, token, 'TaskPresets'),
-      GoogleAPI.listAll(spreadsheetId, token, 'TimeEntries')
-    ]);
-
-    // Cache active projects matching department
-    activeProjects = projects.filter(p => {
-      const isActive = String(p.active) === 'TRUE' || p.active === true;
-      if (!isActive) return false;
-      if (!p.department) return true; // global project
-      
-      const depts = String(p.department).split(',').map(d => d.trim().toLowerCase());
-      return depts.includes(currentEmployee.department.toLowerCase());
-    });
-
-    const select = $('projectSelect');
-    if (activeProjects.length === 0) {
-      select.innerHTML = '<option value="">No projects active</option>';
-    } else {
-      select.innerHTML = activeProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
-    }
-
-    // Filter task presets
-    const departmentTasks = tasks.filter(t => {
-      const isActive = String(t.active) === 'TRUE' || t.active === true;
-      return isActive && t.department === currentEmployee.department;
-    });
-    $('taskSuggestions').innerHTML = departmentTasks.map(t => `<option value="${t.task_name}">`).join('');
-
-    // Check for running timer
-    const running = timeEntries.find(e => e.employee_email.toLowerCase() === userEmail.toLowerCase() && !e.end_time);
-    if (running) {
-      runningEntry = running;
-      showRunningState();
-    } else {
-      showStartState();
-    }
+    await finishLoginSetup();
   } catch (err) {
-    showError(`Error connecting to Google API: ${err.message}`);
+    showError(`Google Connection Error: ${err.message}`);
     $('googleSigninForm').style.display = 'block';
   }
 }
@@ -185,6 +157,109 @@ async function fetchUserProfile(token) {
   });
   if (!res.ok) throw new Error('Failed to load Google profile.');
   return await res.json();
+}
+
+// ---------- SUPABASE LOGIN ----------
+async function loginWithSupabase(token, email) {
+  $('loadingState').style.display = 'block';
+  $('loadingState').textContent = 'Connecting to Supabase...';
+  $('supabaseSigninForm').style.display = 'none';
+  $('supabaseSignupForm').style.display = 'none';
+
+  try {
+    const employees = await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, token, 'employees');
+    const emp = employees.find(e => e.email.toLowerCase() === email.toLowerCase() && e.active === true);
+
+    if (!emp) {
+      // Clear token to force fresh login if employee was deactivated
+      await chrome.storage.local.remove(['supabase_token', 'supabase_user_email']);
+      showError(`Access Denied: No active employee record found for ${email}.`);
+      $('supabaseSigninForm').style.display = 'block';
+      return;
+    }
+
+    currentEmployee = emp;
+    await finishLoginSetup();
+  } catch (err) {
+    // If token has expired, prompt to sign in again
+    await chrome.storage.local.remove(['supabase_token', 'supabase_user_email']);
+    showError(`Session expired or connection failed: ${err.message}`);
+    $('supabaseSigninForm').style.display = 'block';
+  }
+}
+
+// ---------- POST-LOGIN DATA PREPARATION ----------
+async function finishLoginSetup() {
+  $('greeting').textContent = `Hi, ${currentEmployee.name}`;
+  $('greeting').style.display = 'block';
+  $('loadingState').style.display = 'none';
+  $('mainView').style.display = 'block';
+  $('resetBackendBtn').style.display = 'block';
+  $('guideLink').style.display = 'inline-block';
+
+  if (currentEmployee.role === 'admin') {
+    $('adminLink').style.display = 'block';
+  } else {
+    $('adminLink').style.display = 'none';
+  }
+
+  // View reset
+  $('trackerView').style.display = 'block';
+  $('dashboardView').style.display = 'none';
+  $('tabTracker').classList.add('active');
+  $('tabDashboard').classList.remove('active');
+  $('editEntryModal').style.display = 'none';
+
+  // Fetch lists
+  let projects = [];
+  let tasks = [];
+  let timeEntries = [];
+
+  if (backendType === 'sheets') {
+    [projects, tasks, timeEntries] = await Promise.all([
+      GoogleAPI.listAll(spreadsheetId, authToken, 'Projects'),
+      GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets'),
+      GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries')
+    ]);
+  } else if (backendType === 'supabase') {
+    [projects, tasks, timeEntries] = await Promise.all([
+      SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'projects'),
+      SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'task_presets'),
+      SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries')
+    ]);
+  }
+
+  // Filter projects by department
+  activeProjects = projects.filter(p => {
+    const isActive = String(p.active) === 'TRUE' || p.active === true;
+    if (!isActive) return false;
+    if (!p.department) return true; // global
+    const depts = String(p.department).split(',').map(d => d.trim().toLowerCase());
+    return depts.includes(currentEmployee.department.toLowerCase());
+  });
+
+  const select = $('projectSelect');
+  if (activeProjects.length === 0) {
+    select.innerHTML = '<option value="">No projects active</option>';
+  } else {
+    select.innerHTML = activeProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
+  }
+
+  // Filter tasks presets
+  const deptTasks = tasks.filter(t => {
+    const isActive = String(t.active) === 'TRUE' || t.active === true;
+    return isActive && t.department === currentEmployee.department;
+  });
+  $('taskSuggestions').innerHTML = deptTasks.map(t => `<option value="${t.task_name}">`).join('');
+
+  // Check running timer
+  const running = timeEntries.find(e => e.employee_email.toLowerCase() === userEmail.toLowerCase() && !e.end_time);
+  if (running) {
+    runningEntry = running;
+    showRunningState();
+  } else {
+    showStartState();
+  }
 }
 
 function showError(msg) {
@@ -226,21 +301,175 @@ function showRunningState() {
   timerInterval = setInterval(updateTimerText, 1000);
 }
 
-// ---------- BUTTON HANDLERS ----------
-$('googleSigninBtn').addEventListener('click', async () => {
+// ---------- BACKEND SELECTOR EVENT HANDLERS ----------
+$('selectSheetsBtn').addEventListener('click', async () => {
+  await chrome.storage.local.set({ backend_type: 'sheets' });
+  init();
+});
+
+$('selectSupabaseBtn').addEventListener('click', () => {
+  $('supabaseConfigForm').style.display = 'block';
+});
+
+$('saveSupaConfigBtn').addEventListener('click', async () => {
+  const url = $('setupSupaUrl').value.trim();
+  const key = $('setupSupaKey').value.trim();
+
+  if (!url || !key) {
+    alert('Please enter both Supabase URL and Anon Key.');
+    return;
+  }
+
+  $('saveSupaConfigBtn').disabled = true;
+  $('saveSupaConfigBtn').textContent = 'Connecting...';
+
   try {
-    authToken = await GoogleAPI.getAuthToken(true);
-    await loginWithToken(authToken);
+    // Verify connection URL and key by hitting the Auth endpoint
+    const testRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email: 'test-connection@clockroach.com', password: 'password123' })
+    });
+
+    // If we receive a status, key is correct (returns 400 because account doesn't exist).
+    // If key is wrong, it returns 401/403. If URL is wrong, it throws fetch error.
+    if (testRes.status === 400 || testRes.ok) {
+      await chrome.storage.local.set({
+        backend_type: 'supabase',
+        supabase_url: url,
+        supabase_anon_key: key
+      });
+      init();
+    } else {
+      throw new Error('Supabase authorization failed. Verify your URL and Anon Key.');
+    }
   } catch (err) {
-    alert(`Sign-in failed: ${err.message}`);
+    alert(`Connection failed: ${err.message}`);
+  } finally {
+    $('saveSupaConfigBtn').disabled = false;
+    $('saveSupaConfigBtn').textContent = 'Connect to Supabase';
   }
 });
 
+$('resetBackendBtn').addEventListener('click', async () => {
+  if (confirm('Are you sure you want to reset your database backend configuration? This will sign you out.')) {
+    await chrome.storage.local.remove([
+      'backend_type',
+      'supabase_url',
+      'supabase_anon_key',
+      'supabase_token',
+      'supabase_user_email'
+    ]);
+    window.location.reload();
+  }
+});
+
+// ---------- AUTH ACTION HANDLERS ----------
+
+// Google Sheet Login Trigger
+$('googleSigninBtn').addEventListener('click', async () => {
+  try {
+    authToken = await GoogleAPI.getAuthToken(true);
+    await loginWithSheets(authToken);
+  } catch (err) {
+    alert(`Google Authentication failed: ${err.message}`);
+  }
+});
+
+// Supabase Navigation Toggles
+$('linkToSignup').addEventListener('click', () => {
+  $('supabaseSigninForm').style.display = 'none';
+  $('supabaseSignupForm').style.display = 'block';
+});
+
+$('linkToSignin').addEventListener('click', () => {
+  $('supabaseSignupForm').style.display = 'none';
+  $('supabaseSigninForm').style.display = 'block';
+});
+
+// Supabase Login Action
+$('supaSigninBtn').addEventListener('click', async () => {
+  const email = $('supaEmail').value.trim();
+  const password = $('supaPassword').value.trim();
+
+  if (!email || !password) {
+    alert('Enter both email and password.');
+    return;
+  }
+
+  $('supaSigninBtn').disabled = true;
+  $('supaSigninBtn').textContent = 'Signing in...';
+
+  try {
+    const data = await SupabaseAPI.signIn(supabaseUrl, supabaseAnonKey, email, password);
+    const token = data.access_token;
+
+    await chrome.storage.local.set({
+      supabase_token: token,
+      supabase_user_email: email
+    });
+
+    supabaseToken = token;
+    userEmail = email;
+
+    await loginWithSupabase(token, email);
+  } catch (err) {
+    alert(`Login failed: ${err.message}`);
+  } finally {
+    $('supaSigninBtn').disabled = false;
+    $('supaSigninBtn').textContent = 'Sign In';
+  }
+});
+
+// Supabase Signup Action
+$('supaSignupBtn').addEventListener('click', async () => {
+  const name = $('supaRegName').value.trim();
+  const email = $('supaRegEmail').value.trim();
+  const password = $('supaRegPassword').value.trim();
+  const department = $('supaRegDept').value;
+
+  if (!name || !email || !password) {
+    alert('Please fill out all fields.');
+    return;
+  }
+
+  if (password.length < 6) {
+    alert('Password must be at least 6 characters.');
+    return;
+  }
+
+  $('supaSignupBtn').disabled = true;
+  $('supaSignupBtn').textContent = 'Registering...';
+
+  try {
+    const data = await SupabaseAPI.signUp(supabaseUrl, supabaseAnonKey, email, password, name, department);
+    
+    await chrome.storage.local.set({
+      supabase_token: data.token,
+      supabase_user_email: email
+    });
+
+    supabaseToken = data.token;
+    userEmail = email;
+
+    await loginWithSupabase(data.token, email);
+  } catch (err) {
+    alert(`Registration failed: ${err.message}`);
+  } finally {
+    $('supaSignupBtn').disabled = false;
+    $('supaSignupBtn').textContent = 'Register & Sign In';
+  }
+});
+
+// ---------- TIMER ACTION HANDLERS ----------
 $('startBtn').addEventListener('click', async () => {
   const projectId = $('projectSelect').value;
   const task = $('taskInput').value.trim();
-  if (!projectId) { alert('No project is selected.'); return; }
-  if (!task) { alert('Enter or pick a task description.'); return; }
+  if (!projectId) { alert('No project selected.'); return; }
+  if (!task) { alert('Enter task description.'); return; }
 
   $('startBtn').disabled = true;
   $('startBtn').innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation: spin 1s linear infinite;"><circle cx="12" cy="12" r="10"></circle></svg> Starting...`;
@@ -257,20 +486,23 @@ $('startBtn').addEventListener('click', async () => {
       department: currentEmployee.department,
       task_description: task,
       start_time: new Date().toISOString(),
-      end_time: '',
-      duration_minutes: ''
+      end_time: null,
+      duration_minutes: null
     };
 
-    await GoogleAPI.appendRow(spreadsheetId, authToken, 'TimeEntries', HEADERS.TimeEntries, newRow);
-    
-    // Fetch newly written rows to capture row number
-    const updatedEntries = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
-    const foundEntry = updatedEntries.find(e => e.entry_id === entryId);
-    
-    runningEntry = foundEntry || newRow;
+    if (backendType === 'sheets') {
+      await GoogleAPI.appendRow(spreadsheetId, authToken, 'TimeEntries', HEADERS.TimeEntries, newRow);
+      // Fetch rowNum
+      const updated = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
+      runningEntry = updated.find(e => e.entry_id === entryId) || newRow;
+    } else if (backendType === 'supabase') {
+      const res = await SupabaseAPI.insertRow(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries', newRow);
+      runningEntry = res[0] || newRow;
+    }
+
     showRunningState();
-    
-    // Set background alarm check
+
+    // Cache running state in storage for extension background warning alarm
     chrome.storage.local.set({
       runningTimer: { entry_id: runningEntry.entry_id, started_at: Date.now() }
     });
@@ -300,8 +532,14 @@ $('stopBtn').addEventListener('click', async () => {
       duration_minutes: durationMinutes
     };
 
-    // Use stored spreadsheet row number directly
-    await GoogleAPI.updateRow(spreadsheetId, authToken, 'TimeEntries', HEADERS.TimeEntries, runningEntry._rowNum, updatedRow);
+    if (backendType === 'sheets') {
+      await GoogleAPI.updateRow(spreadsheetId, authToken, 'TimeEntries', HEADERS.TimeEntries, runningEntry._rowNum, updatedRow);
+    } else if (backendType === 'supabase') {
+      await SupabaseAPI.updateRow(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries', 'entry_id', runningEntry.entry_id, {
+        end_time: endTime.toISOString(),
+        duration_minutes: durationMinutes
+      });
+    }
 
     runningEntry = null;
     chrome.storage.local.remove('runningTimer');
@@ -316,41 +554,7 @@ $('stopBtn').addEventListener('click', async () => {
   }
 });
 
-// Spin keyframe injector
-const spinStyle = document.createElement('style');
-spinStyle.textContent = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
-document.head.appendChild(spinStyle);
-
-$('adminLink').addEventListener('click', () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('admin.html') });
-});
-
-$('guideLink').addEventListener('click', () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('guide.html') });
-});
-
-$('logoutLink').addEventListener('click', async () => {
-  if (confirm('Are you sure you want to sign out?')) {
-    try {
-      // Revoke OAuth token so user can switch Google accounts
-      await new Promise((resolve) => {
-        chrome.identity.removeCachedAuthToken({ token: authToken }, () => {
-          resolve();
-        });
-      });
-      authToken = null;
-      spreadsheetId = null;
-      userEmail = null;
-      window.location.reload();
-    } catch (err) {
-      window.location.reload();
-    }
-  }
-});
-
-// ---------- DASHBOARD & EDITING LOGIC ----------
-
-// Tab switching
+// Tab Switch
 $('tabTracker').addEventListener('click', () => {
   $('tabTracker').classList.add('active');
   $('tabDashboard').classList.remove('active');
@@ -366,33 +570,35 @@ $('tabDashboard').addEventListener('click', async () => {
   await loadDashboard();
 });
 
-// Load Dashboard Data
+// ---------- DASHBOARD LOGS ----------
 async function loadDashboard() {
   if (!currentEmployee) return;
-  
+
   $('dashboardLoading').style.display = 'block';
   $('entriesList').style.display = 'none';
   $('editEntryModal').style.display = 'none';
-  
+
   try {
-    const entries = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
-    
-    // Filter completed entries for this employee
+    let entries = [];
+    if (backendType === 'sheets') {
+      entries = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
+    } else if (backendType === 'supabase') {
+      entries = await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries');
+    }
+
+    // Filter completed logs for employee
     const completed = entries.filter(e => e.employee_email.toLowerCase() === userEmail.toLowerCase() && e.end_time);
-    
-    // Sort descending by start time to find latest
     completed.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
-    
-    // Calculate stats
+
     const stats = calculateStats(completed);
     $('weekHours').textContent = `${stats.week_hours}h`;
     $('monthHours').textContent = `${stats.month_hours}h`;
-    
+
     dashboardEntries = completed;
-    
+
     $('dashboardLoading').style.display = 'none';
     $('entriesList').style.display = 'flex';
-    
+
     renderDashboardEntries();
   } catch (err) {
     $('dashboardLoading').textContent = `Failed to load logs: ${err.message}`;
@@ -402,14 +608,13 @@ async function loadDashboard() {
 function calculateStats(entries) {
   const now = new Date();
   
-  // Start of current week (Monday)
+  // Monday start
   const startOfWeek = new Date(now);
   const day = startOfWeek.getDay();
   const diff = startOfWeek.getDate() - (day === 0 ? 6 : day - 1);
   startOfWeek.setDate(diff);
   startOfWeek.setHours(0, 0, 0, 0);
   
-  // Start of current month
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   
   let weekMinutes = 0;
@@ -435,52 +640,41 @@ function calculateStats(entries) {
   };
 }
 
-// Render entries
 function renderDashboardEntries() {
   const container = $('entriesList');
   container.innerHTML = '';
   
   if (dashboardEntries.length === 0) {
-    container.innerHTML = '<div class="status" style="margin-top: 20px;">No completed time entries.</div>';
+    container.innerHTML = '<div class="status" style="margin-top: 20px;">No completed logs.</div>';
     return;
   }
-  
-  // Sort entries client-side based on currentSortDirection
+
   const sorted = [...dashboardEntries].sort((a, b) => {
     const dateA = new Date(a.start_time);
     const dateB = new Date(b.start_time);
     return currentSortDirection === 'desc' ? dateB - dateA : dateA - dateB;
   });
-  
-  // Find IDs of the 4 most recent completed entries (chronologically latest)
-  const latestCompleted4Ids = [...dashboardEntries]
+
+  const latest4Ids = [...dashboardEntries]
     .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
     .slice(0, 4)
     .map(e => e.entry_id);
-    
+
   sorted.forEach(entry => {
     const item = document.createElement('div');
     item.className = 'entry-item';
-    
-    const isEditable = latestCompleted4Ids.includes(entry.entry_id);
-    
-    // Format Date: e.g. "Mon, Jul 6"
+    const isEditable = latest4Ids.includes(entry.entry_id);
+
     const startDate = new Date(entry.start_time);
     const dateStr = startDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-    
-    // Format Time: e.g. "10:15 AM - 11:30 AM"
     const startTimeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    let endTimeStr = 'Running';
-    if (entry.end_time) {
-      endTimeStr = new Date(entry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // Format Duration
+    const endTimeStr = entry.end_time ? new Date(entry.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Running';
+
     const mins = Number(entry.duration_minutes) || 0;
     const hrs = Math.floor(mins / 60);
     const remMins = mins % 60;
     const durationStr = hrs > 0 ? `${hrs}h ${remMins}m` : `${remMins}m`;
-    
+
     item.innerHTML = `
       <div class="entry-item-header">
         <div style="flex: 1; min-width: 0;">
@@ -501,54 +695,45 @@ function renderDashboardEntries() {
         <span style="font-weight: 600; color: var(--text-primary);">${durationStr}</span>
       </div>
     `;
-    
+
     if (isEditable) {
-      item.querySelector('.entry-edit-btn').addEventListener('click', () => {
-        openEditModal(entry);
-      });
+      item.querySelector('.entry-edit-btn').addEventListener('click', () => openEditModal(entry));
     }
-    
+
     container.appendChild(item);
   });
 }
 
-// Sort button handler
 $('sortBtn').addEventListener('click', () => {
   currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
   $('sortDirectionText').textContent = currentSortDirection === 'desc' ? 'Newest' : 'Oldest';
   
   const svg = $('sortBtn').querySelector('svg');
-  if (currentSortDirection === 'desc') {
-    svg.style.transform = 'none';
-  } else {
-    svg.style.transform = 'rotate(180deg)';
-  }
+  svg.style.transform = currentSortDirection === 'desc' ? 'none' : 'rotate(180deg)';
   
   renderDashboardEntries();
 });
 
-// Edit modal opening
+// ---------- LOG EDITING MODAL ----------
 function openEditModal(entry) {
   editingEntryId = entry.entry_id;
   $('editError').style.display = 'none';
-  
+
   $('editEntryInfoProject').textContent = entry.project_name || 'No Project';
   $('editEntryInfoTask').textContent = entry.task_description || '(No description)';
-  
+
   const origMins = Number(entry.duration_minutes) || 0;
   const origH = Math.floor(origMins / 60);
   const origM = origMins % 60;
-  
+
   $('editEntryInfoOriginal').textContent = `Original Duration: ${origH}h ${origM}m (Max allowed)`;
-  
   $('editHoursInput').value = origH;
   $('editMinutesInput').value = origM;
-  
-  // Cache original info in dataset
+
   $('editEntryModal').dataset.originalMinutes = origMins;
-  $('editEntryModal').dataset.rowNum = entry._rowNum;
+  $('editEntryModal').dataset.rowNum = entry._rowNum || '';
   $('editEntryModal').dataset.startTime = entry.start_time;
-  
+
   $('editEntryModal').style.display = 'flex';
 }
 
@@ -557,70 +742,71 @@ $('cancelEditBtn').addEventListener('click', () => {
   editingEntryId = null;
 });
 
-// Save edits handler
 $('saveEditBtn').addEventListener('click', async () => {
   if (!editingEntryId) return;
-  
   $('editError').style.display = 'none';
-  
+
   const originalMinutes = Number($('editEntryModal').dataset.originalMinutes) || 0;
-  const rowNum = Number($('editEntryModal').dataset.rowNum);
+  const rowNum = $('editEntryModal').dataset.rowNum;
   const startTimeStr = $('editEntryModal').dataset.startTime;
-  
+
   const newHours = parseInt($('editHoursInput').value || 0, 10);
   const newMinutesVal = parseInt($('editMinutesInput').value || 0, 10);
-  
+
   if (isNaN(newHours) || newHours < 0 || isNaN(newMinutesVal) || newMinutesVal < 0 || newMinutesVal > 59) {
-    showEditError('Please enter valid hours and minutes (0-59).');
+    showEditError('Enter valid hours and minutes (0-59).');
     return;
   }
-  
+
   const newMinutes = newHours * 60 + newMinutesVal;
-  
+
   if (newMinutes > originalMinutes) {
     const origH = Math.floor(originalMinutes / 60);
     const origM = originalMinutes % 60;
-    showEditError(`Duration cannot exceed the original duration of ${origH}h ${origM}m.`);
+    showEditError(`Duration cannot exceed original of ${origH}h ${origM}m.`);
     return;
   }
-  
+
   if (newMinutes === originalMinutes) {
     $('editEntryModal').style.display = 'none';
     editingEntryId = null;
     return;
   }
-  
+
   $('saveEditBtn').disabled = true;
-  const originalBtnText = $('saveEditBtn').innerHTML;
+  const origBtnText = $('saveEditBtn').innerHTML;
   $('saveEditBtn').innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation: spin 1s linear infinite; margin-right: 4px;"><circle cx="12" cy="12" r="10"></circle></svg> Saving...`;
-  
+
   try {
-    // Recalculate end time
     const startTime = new Date(startTimeStr);
     const newEndTime = new Date(startTime.getTime() + newMinutes * 60000);
-    
-    // Find the current full row details to rewrite
-    const currentList = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
-    const matched = currentList.find(e => e.entry_id === editingEntryId);
-    
-    if (!matched) throw new Error('Time entry row not found.');
-    
-    const updatedRow = {
-      ...matched,
-      end_time: newEndTime.toISOString(),
-      duration_minutes: newMinutes
-    };
-    
-    await GoogleAPI.updateRow(spreadsheetId, authToken, 'TimeEntries', HEADERS.TimeEntries, rowNum, updatedRow);
-    
+
+    if (backendType === 'sheets') {
+      const currentList = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
+      const matched = currentList.find(e => e.entry_id === editingEntryId);
+      if (!matched) throw new Error('Row not found.');
+
+      const updatedRow = {
+        ...matched,
+        end_time: newEndTime.toISOString(),
+        duration_minutes: newMinutes
+      };
+      await GoogleAPI.updateRow(spreadsheetId, authToken, 'TimeEntries', HEADERS.TimeEntries, Number(rowNum), updatedRow);
+    } else if (backendType === 'supabase') {
+      await SupabaseAPI.updateRow(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries', 'entry_id', editingEntryId, {
+        end_time: newEndTime.toISOString(),
+        duration_minutes: newMinutes
+      });
+    }
+
     $('editEntryModal').style.display = 'none';
     editingEntryId = null;
     await loadDashboard();
   } catch (err) {
-    showEditError(`Error updating duration: ${err.message}`);
+    showEditError(`Update failed: ${err.message}`);
   } finally {
     $('saveEditBtn').disabled = false;
-    $('saveEditBtn').innerHTML = originalBtnText;
+    $('saveEditBtn').innerHTML = origBtnText;
   }
 });
 
@@ -628,6 +814,32 @@ function showEditError(msg) {
   $('editError').textContent = msg;
   $('editError').style.display = 'block';
 }
+
+// ---------- LOGOUT & OTHER BINDINGS ----------
+$('adminLink').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('admin.html') });
+});
+
+$('guideLink').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('guide.html') });
+});
+
+$('logoutLink').addEventListener('click', async () => {
+  if (confirm('Are you sure you want to sign out?')) {
+    try {
+      if (backendType === 'sheets') {
+        await new Promise((resolve) => {
+          chrome.identity.removeCachedAuthToken({ token: authToken }, () => resolve());
+        });
+      } else if (backendType === 'supabase') {
+        await chrome.storage.local.remove(['supabase_token', 'supabase_user_email']);
+      }
+      window.location.reload();
+    } catch (err) {
+      window.location.reload();
+    }
+  }
+});
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -638,5 +850,9 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+const spinStyle = document.createElement('style');
+spinStyle.textContent = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+document.head.appendChild(spinStyle);
 
 init();

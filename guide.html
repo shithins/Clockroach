@@ -207,20 +207,42 @@
     <div class="card">
       <h2>2. Setup Guides</h2>
       
-      <h3>For the Admin (Company Owner / Manager)</h3>
+      <h3 style="margin-top: 10px;">Option A: Google Sheets Setup</h3>
+      <p>This is the serverless setup where all your data goes directly to Google Sheets in your Google Drive.</p>
+      
+      <h4 style="font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 6px; color: var(--text-primary);">For the Admin (Manager)</h4>
       <ol>
-        <li>Open the extension and click <strong>"Sign In with Google"</strong>.</li>
-        <li>Grant permission for sheets and file creation. Clockroach will automatically search your Google Drive.</li>
-        <li>Since this is your first time, it will automatically create a spreadsheet named <code>Clockroach Time Tracker</code> in your Google Drive.</li>
-        <li>Open the spreadsheet, go to the <strong>Employees</strong> tab, and add your team members' emails. Make sure their <code>active</code> column is set to <code>TRUE</code>.</li>
-        <li><strong>CRITICAL STEP:</strong> Right-click the spreadsheet in Google Drive, click <strong>Share</strong>, and add your employees' Google emails. Give them <strong>"Editor"</strong> permissions so the extension can write logs to the sheet on their behalf.</li>
+        <li>Open the extension, select <strong>"Google Sheets Mode"</strong>.</li>
+        <li>Click <strong>"Sign In with Google"</strong> and authorize the app.</li>
+        <li>It will automatically create a sheet named <code>Clockroach Time Tracker</code> in your Google Drive.</li>
+        <li>Open the sheet, go to the <strong>Employees</strong> tab, and add your team's Google emails (active = <code>TRUE</code>).</li>
+        <li><strong>Share the Google Sheet</strong> in Google Drive with Editor permissions to all your employee emails.</li>
       </ol>
 
-      <h3>For Employees</h3>
+      <h4 style="font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 6px; color: var(--text-primary);">For Employees</h4>
       <ol>
-        <li>Download the Clockroach Chrome Extension.</li>
-        <li>Click <strong>"Sign In with Google"</strong> and select your work Google account.</li>
-        <li>The extension will search your Drive for the shared <code>Clockroach Time Tracker</code> sheet, find it, verify your email is listed as an active employee, and open the tracking interface.</li>
+        <li>Install the extension, select <strong>"Google Sheets Mode"</strong>, and sign in with your Google account.</li>
+        <li>The extension discovers the shared sheet automatically and opens the timer.</li>
+      </ol>
+
+      <h3 style="border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 24px;">Option B: Supabase Setup (Self-Hosted)</h3>
+      <p>This is the SQL-powered database setup, ideal for teams wanting instant, high-performance tracking and full database query capabilities.</p>
+      
+      <h4 style="font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 6px; color: var(--text-primary);">For the Admin (Manager)</h4>
+      <ol>
+        <li>Sign up for a free account on <a href="https://supabase.com" target="_blank" style="color: var(--accent-color); text-decoration: underline;">Supabase</a> and create a project named <code>Clockroach</code>.</li>
+        <li>Open the **SQL Editor** on the left menu, paste the SQL query code from <code>supabase_schema.sql</code> (included in your extension folder), and click **Run**.</li>
+        <li>Go to **Settings → API** and copy your **Project URL** and **Anon API Key**.</li>
+        <li>Open the Clockroach extension, click **"Reset Backend"** (the cog ⚙️ icon in the header) to open setup.</li>
+        <li>Select **"Supabase Mode"**, paste the URL and Anon Key, and click **Connect**.</li>
+        <li>Open the signup form, fill in your Name, Email, and Password. Since you are the first user registering, the database will automatically set your role as **Admin**.</li>
+      </ol>
+
+      <h4 style="font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 6px; color: var(--text-primary);">For Employees</h4>
+      <ol>
+        <li>Click **"Reset Backend"** (the cog ⚙️ icon) in the extension popup.</li>
+        <li>Enter your company's **Supabase URL** and **Anon API Key** (provided by your Admin) and click **Connect**.</li>
+        <li>Sign Up with your name, work email, password, and select your department.</li>
       </ol>
     </div>
 

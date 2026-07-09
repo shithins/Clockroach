@@ -1,3 +1,8 @@
+let backendType = null;
+let supabaseUrl = null;
+let supabaseAnonKey = null;
+let supabaseToken = null;
+
 let authToken = null;
 let spreadsheetId = null;
 let userEmail = null;
@@ -43,40 +48,122 @@ $('themeToggleBtn').addEventListener('click', async () => {
   updateThemeIcon(isLight);
 });
 
+// ---------- DYNAMIC DATABASE ROUTER HELPERS ----------
+
+function getTableName(sheetName) {
+  if (backendType === 'sheets') return sheetName;
+  const mapping = {
+    'Departments': 'departments',
+    'Employees': 'employees',
+    'Projects': 'projects',
+    'TaskPresets': 'task_presets',
+    'TimeEntries': 'time_entries'
+  };
+  return mapping[sheetName];
+}
+
+async function dbListAll(sheetName) {
+  if (backendType === 'sheets') {
+    return await GoogleAPI.listAll(spreadsheetId, authToken, sheetName);
+  } else {
+    const tableName = getTableName(sheetName);
+    return await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, tableName);
+  }
+}
+
+async function dbInsert(sheetName, rowObj) {
+  if (backendType === 'sheets') {
+    return await GoogleAPI.appendRow(spreadsheetId, authToken, sheetName, HEADERS[sheetName], rowObj);
+  } else {
+    const tableName = getTableName(sheetName);
+    const cleanData = { ...rowObj };
+    delete cleanData._rowNum;
+    return await SupabaseAPI.insertRow(supabaseUrl, supabaseAnonKey, supabaseToken, tableName, cleanData);
+  }
+}
+
+async function dbUpdate(sheetName, queryCol, queryVal, rowNum, rowObj) {
+  if (backendType === 'sheets') {
+    return await GoogleAPI.updateRow(spreadsheetId, authToken, sheetName, HEADERS[sheetName], rowNum, rowObj);
+  } else {
+    const tableName = getTableName(sheetName);
+    const cleanData = { ...rowObj };
+    delete cleanData._rowNum;
+    return await SupabaseAPI.updateRow(supabaseUrl, supabaseAnonKey, supabaseToken, tableName, queryCol, queryVal, cleanData);
+  }
+}
+
+async function dbDelete(sheetName, queryCol, queryVal, rowNum) {
+  if (backendType === 'sheets') {
+    return await GoogleAPI.deleteRow(spreadsheetId, authToken, sheetName, rowNum);
+  } else {
+    const tableName = getTableName(sheetName);
+    return await SupabaseAPI.deleteRow(supabaseUrl, supabaseAnonKey, supabaseToken, tableName, queryCol, queryVal);
+  }
+}
+
 // ---------- INITIALIZATION ----------
 async function init() {
   await initTheme();
   
   try {
-    // 1. Get token
-    authToken = await GoogleAPI.getAuthToken(true);
-    
-    // 2. Fetch profile email
-    const profile = await fetchUserProfile(authToken);
-    userEmail = profile.email;
-    
-    // 3. Discover spreadsheet ID
-    spreadsheetId = await GoogleAPI.findSpreadsheet(authToken);
-    if (!spreadsheetId) {
-      alert('Spreadsheet not found. Please open the Extension popup first to generate the tracker.');
-      return;
-    }
+    const stored = await chrome.storage.local.get([
+      'backend_type',
+      'supabase_url',
+      'supabase_anon_key',
+      'supabase_token',
+      'supabase_user_email'
+    ]);
 
-    // 4. Verify Admin Role
-    const employees = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
-    const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && (e.active === 'TRUE' || e.active === true));
-    
-    if (!emp || emp.role !== 'admin') {
+    backendType = stored.backend_type;
+
+    if (!backendType) {
       document.body.innerHTML = `
         <div class="container" style="text-align: center; margin-top: 100px;">
-          <h2>Access Denied</h2>
-          <p>You must be registered as an "admin" in the Employees sheet to view this dashboard.</p>
+          <h2>Configuration Missing</h2>
+          <p>Database backend is not configured yet. Please open the Extension popup first to complete the setup.</p>
         </div>
       `;
       return;
     }
 
-    // 5. Initial Refresh
+    if (backendType === 'sheets') {
+      // sheets verification
+      authToken = await GoogleAPI.getAuthToken(true);
+      userEmail = (await fetchUserProfile(authToken)).email;
+      spreadsheetId = await GoogleAPI.findSpreadsheet(authToken);
+      if (!spreadsheetId) {
+        alert('Spreadsheet not found. Open the Extension popup first to generate the tracker.');
+        return;
+      }
+    } else if (backendType === 'supabase') {
+      // supabase verification
+      supabaseUrl = stored.supabase_url;
+      supabaseAnonKey = stored.supabase_anon_key;
+      supabaseToken = stored.supabase_token;
+      userEmail = stored.supabase_user_email;
+
+      if (!supabaseToken || !userEmail) {
+        alert('Session expired. Please sign in via the extension popup first.');
+        return;
+      }
+    }
+
+    // Verify user is active admin
+    const employees = await dbListAll('Employees');
+    const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && (e.active === 'TRUE' || e.active === 'true' || e.active === true));
+    
+    if (!emp || emp.role !== 'admin') {
+      document.body.innerHTML = `
+        <div class="container" style="text-align: center; margin-top: 100px;">
+          <h2>Access Denied</h2>
+          <p>You must be registered as an "admin" in the employees list to access this dashboard.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Refresh lists
     await Promise.all([
       refreshDepartments(),
       refreshEmployees(),
@@ -111,14 +198,12 @@ document.querySelectorAll('.tab').forEach(t => {
 
 // ---------- DEPARTMENTS ----------
 async function refreshDepartments() {
-  const depts = await GoogleAPI.listAll(spreadsheetId, authToken, 'Departments');
+  const depts = await dbListAll('Departments');
   
-  // Update UI dropdowns
   const options = depts.map(d => `<option value="${d.department_name}">${d.department_name}</option>`).join('');
   $('empDept').innerHTML = options;
   $('taskDept').innerHTML = options;
   
-  // Update Project checklist
   const deptCheckboxes = depts.map(d => `
     <label style="display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; font-weight: normal; text-transform: none;">
       <input type="checkbox" name="projDeptCheck" value="${d.department_name}" style="width: auto;">
@@ -143,7 +228,7 @@ $('addDeptBtn').addEventListener('click', async () => {
   
   $('addDeptBtn').disabled = true;
   try {
-    await GoogleAPI.appendRow(spreadsheetId, authToken, 'Departments', HEADERS.Departments, {
+    await dbInsert('Departments', {
       department_id: newId,
       department_name: name
     });
@@ -158,12 +243,12 @@ $('addDeptBtn').addEventListener('click', async () => {
 });
 
 async function removeDept(id) {
-  if (confirm("Are you sure you want to delete this department? This won't delete linked entries, but may affect filters.")) {
+  if (confirm("Are you sure you want to delete this department?")) {
     try {
-      const depts = await GoogleAPI.listAll(spreadsheetId, authToken, 'Departments');
+      const depts = await dbListAll('Departments');
       const matched = depts.find(d => d.department_id === id);
       if (matched) {
-        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'Departments', matched._rowNum);
+        await dbDelete('Departments', 'department_id', id, matched._rowNum);
         await refreshDepartments();
         await populateFilterDropdowns();
       }
@@ -175,7 +260,7 @@ async function removeDept(id) {
 
 // ---------- EMPLOYEES ----------
 async function refreshEmployees() {
-  const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
+  const emps = await dbListAll('Employees');
   $('employeesTable').querySelector('tbody').innerHTML = emps.map(e => {
     const active = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
     const statusText = active ? 'Active' : 'Inactive';
@@ -200,14 +285,14 @@ async function refreshEmployees() {
 
 async function toggleEmpActive(id, activeState) {
   try {
-    const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
+    const emps = await dbListAll('Employees');
     const matched = emps.find(e => e.employee_id === id);
     if (matched) {
       const updated = {
         ...matched,
         active: activeState
       };
-      await GoogleAPI.updateRow(spreadsheetId, authToken, 'Employees', HEADERS.Employees, matched._rowNum, updated);
+      await dbUpdate('Employees', 'employee_id', id, matched._rowNum, updated);
       await refreshEmployees();
       populateFilterDropdowns();
     }
@@ -225,7 +310,7 @@ $('addEmpBtn').addEventListener('click', async () => {
   
   $('addEmpBtn').disabled = true;
   try {
-    await GoogleAPI.appendRow(spreadsheetId, authToken, 'Employees', HEADERS.Employees, {
+    await dbInsert('Employees', {
       employee_id: newId,
       email: email,
       name: name,
@@ -247,10 +332,10 @@ $('addEmpBtn').addEventListener('click', async () => {
 async function removeEmp(id) {
   if (confirm('Delete this employee record permanently from the database?')) {
     try {
-      const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
+      const emps = await dbListAll('Employees');
       const matched = emps.find(e => e.employee_id === id);
       if (matched) {
-        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'Employees', matched._rowNum);
+        await dbDelete('Employees', 'employee_id', id, matched._rowNum);
         await refreshEmployees();
         populateFilterDropdowns();
       }
@@ -262,7 +347,7 @@ async function removeEmp(id) {
 
 // ---------- PROJECTS ----------
 async function refreshProjects() {
-  const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
+  const projects = await dbListAll('Projects');
   $('projectsTable').querySelector('tbody').innerHTML = projects.map(p => {
     const active = String(p.active) === 'TRUE' || p.active === 'true' || p.active === true;
     const statusText = active ? 'Active' : 'Inactive';
@@ -285,14 +370,14 @@ async function refreshProjects() {
 
 async function toggleProjActive(id, activeState) {
   try {
-    const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
+    const projects = await dbListAll('Projects');
     const matched = projects.find(p => p.project_id === id);
     if (matched) {
       const updated = {
         ...matched,
         active: activeState
       };
-      await GoogleAPI.updateRow(spreadsheetId, authToken, 'Projects', HEADERS.Projects, matched._rowNum, updated);
+      await dbUpdate('Projects', 'project_id', id, matched._rowNum, updated);
       await refreshProjects();
       populateFilterDropdowns();
     }
@@ -315,7 +400,7 @@ $('addProjBtn').addEventListener('click', async () => {
   
   $('addProjBtn').disabled = true;
   try {
-    await GoogleAPI.appendRow(spreadsheetId, authToken, 'Projects', HEADERS.Projects, {
+    await dbInsert('Projects', {
       project_id: newId,
       project_name: name,
       department: checkedDepts.join(', '),
@@ -337,10 +422,10 @@ $('addProjBtn').addEventListener('click', async () => {
 async function removeProj(id) {
   if (confirm('Delete this project permanently from the database?')) {
     try {
-      const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
+      const projects = await dbListAll('Projects');
       const matched = projects.find(p => p.project_id === id);
       if (matched) {
-        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'Projects', matched._rowNum);
+        await dbDelete('Projects', 'project_id', id, matched._rowNum);
         await refreshProjects();
         populateFilterDropdowns();
       }
@@ -352,7 +437,7 @@ async function removeProj(id) {
 
 // ---------- TASK PRESETS ----------
 async function refreshTasks() {
-  const tasks = await GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets');
+  const tasks = await dbListAll('TaskPresets');
   $('tasksTable').querySelector('tbody').innerHTML = tasks.map(t => `
     <tr>
       <td>${t.task_name}</td>
@@ -370,7 +455,7 @@ $('addTaskBtn').addEventListener('click', async () => {
   
   $('addTaskBtn').disabled = true;
   try {
-    await GoogleAPI.appendRow(spreadsheetId, authToken, 'TaskPresets', HEADERS.TaskPresets, {
+    await dbInsert('TaskPresets', {
       task_id: newId,
       task_name: name,
       department: $('taskDept').value,
@@ -388,10 +473,10 @@ $('addTaskBtn').addEventListener('click', async () => {
 async function removeTask(id) {
   if (confirm('Delete this task preset?')) {
     try {
-      const tasks = await GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets');
+      const tasks = await dbListAll('TaskPresets');
       const matched = tasks.find(t => t.task_id === id);
       if (matched) {
-        await GoogleAPI.deleteRow(spreadsheetId, authToken, 'TaskPresets', matched._rowNum);
+        await dbDelete('TaskPresets', 'task_id', id, matched._rowNum);
         await refreshTasks();
       }
     } catch (err) {
@@ -402,11 +487,11 @@ async function removeTask(id) {
 
 // ---------- REPORTS ----------
 async function populateFilterDropdowns() {
-  const emps = await GoogleAPI.listAll(spreadsheetId, authToken, 'Employees');
+  const emps = await dbListAll('Employees');
   $('filterEmployee').innerHTML = '<option value="">All employees</option>' +
     emps.map(e => `<option value="${e.email}">${e.name} (${e.email})</option>`).join('');
 
-  const projects = await GoogleAPI.listAll(spreadsheetId, authToken, 'Projects');
+  const projects = await dbListAll('Projects');
   const dropdown = $('projectSelectDropdown');
   dropdown.innerHTML = projects.map(p => `
     <label class="multiselect-option">
@@ -416,12 +501,12 @@ async function populateFilterDropdowns() {
   `).join('');
   $('projectSelectTrigger').textContent = 'All projects';
 
-  const depts = await GoogleAPI.listAll(spreadsheetId, authToken, 'Departments');
+  const depts = await dbListAll('Departments');
   $('filterDepartment').innerHTML = '<option value="">All departments</option>' +
     depts.map(d => `<option value="${d.department_name}">${d.department_name}</option>`).join('');
 }
 
-// Multiselect dropdown toggler
+// Multiselect togglers
 $('projectSelectTrigger').addEventListener('click', (e) => {
   e.stopPropagation();
   const dropdown = $('projectSelectDropdown');
@@ -461,7 +546,7 @@ async function runReport() {
   
   try {
     // 1. Fetch completed entries
-    const allEntries = await GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries');
+    const allEntries = await dbListAll('TimeEntries');
     let entries = allEntries.filter(e => e.end_time); // completed only
     
     // 2. Apply filters client-side

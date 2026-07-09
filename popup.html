@@ -34,6 +34,32 @@
     <div id="loadingState" class="status">Connecting to database...</div>
     <div id="loginError" class="error" style="display:none;"></div>
 
+    <!-- Setup View (Select Backend) -->
+    <div id="setupView" style="display:none;">
+      <p class="status" style="margin-bottom: 16px; text-align: center; color: var(--text-secondary);">Select your Time Tracker database backend:</p>
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+        <button class="btn-primary" id="selectSheetsBtn" style="width: 100%; padding: 12px; font-weight: 600;">
+          Google Sheets Mode
+        </button>
+        <button class="btn-secondary" id="selectSupabaseBtn" style="width: 100%; padding: 12px; font-weight: 600; border: 1px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary);">
+          Supabase Mode (Self-Hosted)
+        </button>
+      </div>
+
+      <!-- Supabase Keys Configuration Form -->
+      <div id="supabaseConfigForm" style="display:none; border-top: 1px solid var(--border-color); padding-top: 16px;">
+        <label>Supabase Project URL</label>
+        <input type="text" id="setupSupaUrl" placeholder="https://xxxx.supabase.co" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+        
+        <label>Supabase Anon Key</label>
+        <input type="password" id="setupSupaKey" placeholder="eyJhbGciOi..." style="margin-bottom: 16px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+        
+        <button class="btn-primary" id="saveSupaConfigBtn" style="width: 100%;">
+          Connect to Supabase
+        </button>
+      </div>
+    </div>
+
     <!-- Google OAuth Sign-In -->
     <div id="googleSigninForm" style="display:none; text-align: center; padding: 12px 0;">
       <p class="status" style="margin-bottom: 16px; color: var(--text-secondary); text-align: center;">Sign in with your Google account to track time.</p>
@@ -48,6 +74,49 @@
       </button>
     </div>
 
+    <!-- Supabase Sign-In Form -->
+    <div id="supabaseSigninForm" style="display:none; padding: 12px 0;">
+      <p class="status" style="margin-bottom: 12px; text-align: left; color: var(--text-secondary);">Sign in to your Supabase project:</p>
+      <label>Email Address</label>
+      <input type="email" id="supaEmail" placeholder="employee@company.com" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+      
+      <label>Password</label>
+      <input type="password" id="supaPassword" placeholder="••••••••" style="margin-bottom: 16px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+      
+      <button class="btn-primary" id="supaSigninBtn" style="width: 100%; margin-bottom: 16px;">Sign In</button>
+      
+      <p style="text-align: center; font-size: 12px; color: var(--text-secondary);">
+        New employee? <a id="linkToSignup" style="color: var(--accent-color); cursor: pointer; text-decoration: underline;">Sign Up / Register</a>
+      </p>
+    </div>
+
+    <!-- Supabase Sign-Up Form -->
+    <div id="supabaseSignupForm" style="display:none; padding: 12px 0;">
+      <p class="status" style="margin-bottom: 12px; text-align: left; color: var(--text-secondary);">Register employee account:</p>
+      
+      <label>Full Name</label>
+      <input type="text" id="supaRegName" placeholder="John Doe" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+
+      <label>Email Address</label>
+      <input type="email" id="supaRegEmail" placeholder="employee@company.com" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+      
+      <label>Password</label>
+      <input type="password" id="supaRegPassword" placeholder="Minimum 6 characters" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+      
+      <label>Department</label>
+      <select id="supaRegDept" style="margin-bottom: 20px; width: 100%; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-primary);">
+        <option value="Development">Development</option>
+        <option value="Marketing">Marketing</option>
+        <option value="Sales">Sales</option>
+      </select>
+      
+      <button class="btn-primary" id="supaSignupBtn" style="width: 100%; margin-bottom: 16px;">Register & Sign In</button>
+      
+      <p style="text-align: center; font-size: 12px; color: var(--text-secondary);">
+        Already have an account? <a id="linkToSignin" style="color: var(--accent-color); cursor: pointer; text-decoration: underline;">Sign In</a>
+      </p>
+    </div>
+
     <!-- Greeting block -->
     <div class="greeting-row">
       <div id="greeting" style="display:none;"></div>
@@ -55,6 +124,12 @@
         <a id="guideLink" style="display:none;" title="How to use Clockroach">Guide</a>
         <a id="sheetLink" target="_blank" style="display:none;" title="Open Google Sheet">Google Sheet</a>
         <a id="adminLink" style="display:none;">Admin Panel</a>
+        <button id="resetBackendBtn" title="Reset Backend selection" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; padding: 4px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
         <a id="logoutLink" style="color: var(--text-secondary);">Logout</a>
       </div>
     </div>

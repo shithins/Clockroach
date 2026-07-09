@@ -259,3 +259,165 @@ const GoogleAPI = {
     return true;
   }
 };
+
+const SupabaseAPI = {
+  // 1. Sign in with email and password
+  signIn: async function(url, key, email, password) {
+    const signInUrl = `${url}/auth/v1/token?grant_type=password`;
+    const res = await fetch(signInUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error_description || err.error?.message || 'Failed to sign in.');
+    }
+    
+    return await res.json();
+  },
+
+  // 2. Sign up with email, password, name, and department
+  signUp: async function(url, key, email, password, name, department) {
+    // 2.a Sign up in Supabase Auth
+    const signUpUrl = `${url}/auth/v1/signup`;
+    const res = await fetch(signUpUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error_description || err.error?.message || 'Failed to sign up.');
+    }
+    
+    const signupData = await res.json();
+    const token = signupData.access_token;
+    
+    if (!token) {
+      throw new Error('Sign up successful, but auto-login is disabled. Please ask your administrator to verify your email and activate your account.');
+    }
+
+    // 2.b Check if this is the first user registered in employees table
+    let role = 'employee';
+    try {
+      const employees = await this.listAll(url, key, token, 'employees');
+      if (employees.length === 0) {
+        role = 'admin'; // First user is automatically Admin!
+      }
+    } catch (e) {
+      // If we cannot list, default to employee
+    }
+    
+    // 2.c Insert record into public.employees table
+    const employeeId = Math.random().toString(36).substring(2, 10);
+    const newEmp = {
+      employee_id: employeeId,
+      email: email,
+      name: name,
+      department: department,
+      role: role,
+      active: true
+    };
+    
+    await this.insertRow(url, key, token, 'employees', newEmp);
+    
+    return { token, employee: newEmp };
+  },
+
+  // 3. Get all rows in a table
+  listAll: async function(url, key, token, table, queryParams = '') {
+    let listUrl = `${url}/rest/v1/${table}?select=*`;
+    if (queryParams) {
+      listUrl += `&${queryParams}`;
+    }
+    
+    const res = await fetch(listUrl, {
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || `Failed to fetch data from ${table}.`);
+    }
+    
+    return await res.json();
+  },
+
+  // 4. Insert row into table
+  insertRow: async function(url, key, token, table, rowObj) {
+    const insertUrl = `${url}/rest/v1/${table}`;
+    const res = await fetch(insertUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(rowObj)
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || `Failed to insert record into ${table}.`);
+    }
+    
+    return await res.json();
+  },
+
+  // 5. Update row in table
+  updateRow: async function(url, key, token, table, queryCol, queryVal, rowObj) {
+    const updateUrl = `${url}/rest/v1/${table}?${queryCol}=eq.${encodeURIComponent(queryVal)}`;
+    const res = await fetch(updateUrl, {
+      method: 'PATCH',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(rowObj)
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || `Failed to update record in ${table}.`);
+    }
+    
+    return await res.json();
+  },
+
+  // 6. Delete row from table
+  deleteRow: async function(url, key, token, table, queryCol, queryVal) {
+    const deleteUrl = `${url}/rest/v1/${table}?${queryCol}=eq.${encodeURIComponent(queryVal)}`;
+    const res = await fetch(deleteUrl, {
+      method: 'DELETE',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || `Failed to delete record from ${table}.`);
+    }
+    
+    return true;
+  }
+};
+
