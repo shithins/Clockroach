@@ -312,31 +312,52 @@ const SupabaseAPI = {
       throw new Error('Sign up successful, but auto-login is disabled. Please ask your administrator to verify your email and activate your account.');
     }
 
-    // 2.b Check if this is the first user registered in employees table
-    let role = 'employee';
+    // 2.b Verify employee in public.employees table
+    let employees = [];
     try {
-      const employees = await this.listAll(url, key, token, 'employees');
-      if (employees.length === 0) {
-        role = 'admin'; // First user is automatically Admin!
-      }
+      employees = await this.listAll(url, key, token, 'employees');
     } catch (e) {
-      // If we cannot list, default to employee
+      console.error('Failed to query employees table', e);
     }
-    
-    // 2.c Insert record into public.employees table
-    const employeeId = Math.random().toString(36).substring(2, 10);
-    const newEmp = {
-      employee_id: employeeId,
-      email: email,
-      name: name,
-      department: department,
-      role: role,
-      active: true
-    };
-    
-    await this.insertRow(url, key, token, 'employees', newEmp);
-    
-    return { token, employee: newEmp };
+
+    const emailLower = email.toLowerCase();
+    const existingEmp = employees.find(e => e.email.toLowerCase() === emailLower);
+
+    // Initial project setup: if there are no employee records, make them Admin Owner
+    if (employees.length === 0) {
+      const employeeId = Math.random().toString(36).substring(2, 10);
+      const newEmp = {
+        employee_id: employeeId,
+        email: email,
+        name: name || 'Admin Owner',
+        department: department || 'Development',
+        role: 'admin',
+        active: true
+      };
+      await this.insertRow(url, key, token, 'employees', newEmp);
+      return { token, employee: newEmp };
+    }
+
+    if (!existingEmp) {
+      throw new Error('Your email has not been added to this workspace. Please contact your administrator.');
+    }
+
+    const isActive = existingEmp.active === true || existingEmp.active === 'true' || existingEmp.active === 'TRUE';
+    if (!isActive) {
+      throw new Error('Your account is inactive. Please contact your administrator.');
+    }
+
+    // If a name was entered and it differs, update it in the database
+    if (name && name.trim() && existingEmp.name !== name.trim()) {
+      try {
+        existingEmp.name = name.trim();
+        await this.updateRow(url, key, token, 'employees', 'email', email, { name: name.trim() });
+      } catch (e) {
+        console.error('Failed to update employee name in DB', e);
+      }
+    }
+
+    return { token, employee: existingEmp };
   },
 
   // 3. Get all rows in a table

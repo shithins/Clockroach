@@ -121,7 +121,7 @@
         Sign In with Google
       </button>
 
-      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px; color: var(--text-secondary); font-size: 11px;">
+      <div id="unifiedDivider" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px; color: var(--text-secondary); font-size: 11px;">
         <span style="height: 1px; background-color: var(--border-color); flex-grow: 1;"></span>
         <span>OR CONNECT SUPABASE WORKSPACE</span>
         <span style="height: 1px; background-color: var(--border-color); flex-grow: 1;"></span>
@@ -130,9 +130,15 @@
       <!-- Supabase Form -->
       <div id="unifiedSupabaseForm">
         <!-- Invitation Code Field -->
-        <div id="unifiedInviteCodeWrapper" style="display:none;">
+        <div id="unifiedInviteCodeWrapper" style="display:none; margin-bottom: 12px;">
           <label>Workspace Invitation Code</label>
-          <textarea id="unifiedInviteInput" placeholder="Paste the invitation code sent by your admin..." style="margin-bottom: 12px; width: 100%; height: 60px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-family: monospace; font-size: 10px; resize: none; line-height: 1.4;"></textarea>
+          <textarea id="unifiedInviteInput" placeholder="Paste the invitation code sent by your admin..." style="width: 100%; height: 60px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-family: monospace; font-size: 10px; resize: none; line-height: 1.4;"></textarea>
+        </div>
+
+        <!-- Full Name Field -->
+        <div id="unifiedNameWrapper" style="display:none; margin-bottom: 12px;">
+          <label>Full Name</label>
+          <input type="text" id="unifiedName" placeholder="John Doe" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
         </div>
 
         <label>Email Address</label>
@@ -141,50 +147,14 @@
         <label>Password</label>
         <input type="password" id="unifiedPassword" placeholder="••••••••" style="margin-bottom: 16px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
         
-        <button class="btn-primary" id="unifiedSubmitBtn" style="width: 100%; margin-bottom: 16px; font-weight: 700;">Sign In</button>
+        <button class="btn-primary" id="unifiedSubmitBtn" style="width: 100%; margin-bottom: 16px; font-weight: 700;">Connect & Sign In</button>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 10px; text-align: center; font-size: 12px; color: var(--text-secondary); border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 8px;">
+      <div style="display: flex; flex-direction: column; gap: 10px; text-align: center; font-size: 11px; color: var(--text-secondary); border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 8px;">
         <p>
-          New user? <a id="unifiedToRegisterLink" style="color: var(--accent-color); cursor: pointer; text-decoration: underline;">Register Account</a>
-        </p>
-        <p style="font-size: 11px;">
           Manager? <a id="unifiedToSetupLink" style="color: var(--accent-indigo); cursor: pointer; text-decoration: underline;">Set up a new company tracker</a>
         </p>
       </div>
-    </div>
-
-    <!-- Supabase Sign-Up Form -->
-    <div id="supabaseSignupForm" style="display:none; padding: 12px 0;">
-      <p class="status" style="margin-bottom: 12px; text-align: left; color: var(--text-secondary);">Register employee account:</p>
-      
-      <!-- Workspace Invitation Code Field -->
-      <div id="unifiedRegInviteCodeWrapper" style="display:none;">
-        <label>Workspace Invitation Code</label>
-        <textarea id="unifiedRegInviteInput" placeholder="Paste the invitation code sent by your admin..." style="margin-bottom: 12px; width: 100%; height: 60px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-family: monospace; font-size: 10px; resize: none; line-height: 1.4;"></textarea>
-      </div>
-
-      <label>Full Name</label>
-      <input type="text" id="supaRegName" placeholder="John Doe" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
-
-      <label>Email Address</label>
-      <input type="email" id="supaRegEmail" placeholder="employee@company.com" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
-      
-      <label>Password</label>
-      <input type="password" id="supaRegPassword" placeholder="Minimum 6 characters" style="margin-bottom: 12px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
-      
-      <label>Department</label>
-      <select id="supaRegDept" style="margin-bottom: 20px; width: 100%; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-primary);">
-        <option value="Development">Development</option>
-        <option value="Marketing">Marketing</option>
-        <option value="Sales">Sales</option>
-      </select>
-      
-      <button class="btn-primary" id="supaSignupBtn" style="width: 100%; margin-bottom: 16px;">Register & Sign In</button>
-      
-      <p style="text-align: center; font-size: 12px; color: var(--text-secondary);">
-        Already have an account? <a id="linkToSignin" style="color: var(--accent-color); cursor: pointer; text-decoration: underline;">Sign In</a>
-      </p>
     </div>
 
     <!-- Greeting block -->
@@ -298,9 +268,6 @@
         </div>
       </div>
 
-      <!-- Navigation links -->
-      <div id="adminLink" class="admin-link" style="display:none;">Open Admin Panel →</div>
-      <div id="logoutLink" class="admin-link" style="margin-top: 8px; color: var(--text-muted); font-size: 11px;">Switch Account</div>
     </div>
   </div>
 
