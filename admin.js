@@ -310,6 +310,11 @@ async function removeDept(id) {
 // ---------- EMPLOYEES ----------
 async function refreshEmployees() {
   const emps = await dbListAll('Employees');
+  
+  // Calculate active and total employee counts
+  const activeCount = emps.filter(e => String(e.active) === 'TRUE' || e.active === 'true' || e.active === true).length;
+  $('registeredEmployeesTitle').textContent = `Registered Employees (Active: ${activeCount} / Total: ${emps.length})`;
+
   $('employeesTable').querySelector('tbody').innerHTML = emps.map(e => {
     const active = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
     const statusText = active ? 'Active' : 'Inactive';
