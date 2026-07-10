@@ -108,14 +108,14 @@ const GoogleAPI = {
         data: [
           // Headers
           { range: 'Employees!A1:F1', values: [['employee_id', 'email', 'name', 'department', 'role', 'active']] },
-          { range: 'Departments!A1:B1', values: [['department_id', 'department_name']] },
+          { range: 'Departments!A1:C1', values: [['department_id', 'department_name', 'parent_department']] },
           { range: 'Projects!A1:D1', values: [['project_id', 'project_name', 'department', 'active']] },
           { range: 'TaskPresets!A1:D1', values: [['task_id', 'task_name', 'department', 'active']] },
           { range: 'TimeEntries!A1:I1', values: [['entry_id', 'employee_email', 'project_id', 'project_name', 'department', 'task_description', 'start_time', 'end_time', 'duration_minutes']] },
           
           // Seed Data
           { range: 'Employees!A2:F2', values: [['E1', userEmail || 'admin@yourcompany.com', 'Admin Owner', 'Development', 'admin', true]] },
-          { range: 'Departments!A2:B4', values: [['D1', 'Development'], ['D2', 'Marketing'], ['D3', 'Sales']] },
+          { range: 'Departments!A2:C4', values: [['D1', 'Development', ''], ['D2', 'Marketing', ''], ['D3', 'Sales', '']] },
           { range: 'Projects!A2:D3', values: [['P1', 'Project Alpha', 'Development, Marketing', true], ['P2', 'Project Beta', 'Development', true]] },
           { range: 'TaskPresets!A2:C4', values: [['T1', 'Research', 'Development'], ['T2', 'Coding', 'Development'], ['T3', 'Design', 'Development']] }
         ]

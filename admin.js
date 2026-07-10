@@ -14,7 +14,7 @@ const $ = id => document.getElementById(id);
 
 const HEADERS = {
   Employees: ['employee_id', 'email', 'name', 'department', 'role', 'active'],
-  Departments: ['department_id', 'department_name'],
+  Departments: ['department_id', 'department_name', 'parent_department'],
   Projects: ['project_id', 'project_name', 'department', 'active'],
   TaskPresets: ['task_id', 'task_name', 'department', 'active'],
   TimeEntries: ['entry_id', 'employee_email', 'project_id', 'project_name', 'department', 'task_description', 'start_time', 'end_time', 'duration_minutes']
@@ -229,28 +229,46 @@ document.querySelectorAll('.tab').forEach(t => {
 async function refreshDepartments() {
   const depts = await dbListAll('Departments');
   
-  const options = depts.map(d => `<option value="${d.department_name}">${d.department_name}</option>`).join('');
+  // Format options with Parent - Sub layout
+  const formattedDepts = depts.map(d => {
+    return {
+      id: d.department_id,
+      name: d.department_name,
+      parent: d.parent_department || '',
+      displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
+    };
+  }).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const options = formattedDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
   $('empDept').innerHTML = options;
   $('taskDept').innerHTML = options;
   
-  const deptCheckboxes = depts.map(d => `
+  // Also populate the parent selection dropdown inside Departments tab
+  // Note: Only root departments (those without parents) can be selected as parents, to prevent infinite loops!
+  const rootDepts = formattedDepts.filter(d => !d.parent);
+  $('deptParent').innerHTML = '<option value="">-- No Parent (Root Department) --</option>' + 
+    rootDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+
+  const deptCheckboxes = formattedDepts.map(d => `
     <label style="display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; font-weight: normal; text-transform: none;">
-      <input type="checkbox" name="projDeptCheck" value="${d.department_name}" style="width: auto;">
-      <span>${d.department_name}</span>
+      <input type="checkbox" name="projDeptCheck" value="${d.name}" style="width: auto;">
+      <span>${d.displayName}</span>
     </label>
   `).join('');
   $('projDeptsContainer').innerHTML = deptCheckboxes || '<span class="status">No departments available</span>';
 
-  $('departmentsTable').querySelector('tbody').innerHTML = depts.map(d => `
+  $('departmentsTable').querySelector('tbody').innerHTML = formattedDepts.map(d => `
     <tr>
-      <td style="font-weight: 500;">${d.department_name}</td>
-      <td><button class="btn-secondary btn-delete" data-id="${d.department_id}">Delete</button></td>
+      <td style="font-weight: 500;">${d.name}</td>
+      <td>${d.parent ? `<span class="badge" style="background-color: var(--bg-tertiary);">${d.parent}</span>` : '<span style="color: var(--text-muted); font-size: 12px;">None (Root)</span>'}</td>
+      <td><button class="btn-secondary btn-delete" data-id="${d.id}">Delete</button></td>
     </tr>
   `).join('');
 }
 
 $('addDeptBtn').addEventListener('click', async () => {
   const name = $('deptName').value.trim();
+  const parent = $('deptParent').value;
   if (!name) return;
   
   const newId = Math.random().toString(36).substring(2, 10);
@@ -259,9 +277,11 @@ $('addDeptBtn').addEventListener('click', async () => {
   try {
     await dbInsert('Departments', {
       department_id: newId,
-      department_name: name
+      department_name: name,
+      parent_department: parent || ''
     });
     $('deptName').value = '';
+    $('deptParent').value = '';
     await refreshDepartments();
     await populateFilterDropdowns();
   } catch (err) {
@@ -304,7 +324,8 @@ async function refreshEmployees() {
         <td><span class="badge" style="background-color: var(--bg-tertiary);">${e.role}</span></td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>
-          <button class="btn-secondary ${toggleBtnClass}" data-id="${e.employee_id}" data-active="${!active}">${toggleText}</button>
+          <button class="btn-secondary btn-edit-emp" data-id="${e.employee_id}" style="margin-right: 4px;">Edit</button>
+          <button class="btn-secondary ${toggleBtnClass}" data-id="${e.employee_id}" data-active="${!active}" style="margin-right: 4px;">${toggleText}</button>
           <button class="btn-secondary btn-delete" data-id="${e.employee_id}">Delete</button>
         </td>
       </tr>
@@ -906,6 +927,8 @@ $('employeesTable').querySelector('tbody').addEventListener('click', async (e) =
   } else if (btn.classList.contains('btn-activate') || btn.classList.contains('btn-deactivate')) {
     const activeState = btn.dataset.active === 'true';
     await toggleEmpActive(id, activeState);
+  } else if (btn.classList.contains('btn-edit-emp')) {
+    await openEditEmpModal(id);
   }
 });
 
@@ -927,6 +950,78 @@ $('tasksTable').querySelector('tbody').addEventListener('click', async (e) => {
   const id = btn.dataset.id;
   if (btn.classList.contains('btn-delete')) {
     await removeTask(id);
+  }
+});
+
+// ---------- EDIT EMPLOYEE MODAL HANDLERS ----------
+async function openEditEmpModal(id) {
+  const emps = await dbListAll('Employees');
+  const matched = emps.find(e => e.employee_id === id);
+  if (!matched) return;
+
+  $('editEmpId').value = id;
+  $('editEmpRowIndex').value = matched._rowNum || '';
+  $('editEmpName').value = matched.name;
+  $('editEmpEmail').value = matched.email;
+  
+  // Populate departments select dropdown in the modal
+  const depts = await dbListAll('Departments');
+  const formattedDepts = depts.map(d => {
+    return {
+      name: d.department_name,
+      displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
+    };
+  }).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const options = formattedDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
+  $('editEmpDept').innerHTML = options;
+  $('editEmpDept').value = matched.department;
+
+  $('editEmpRole').value = matched.role;
+  $('editEmpModal').style.display = 'flex';
+}
+
+$('cancelEditEmpBtn').addEventListener('click', () => {
+  $('editEmpModal').style.display = 'none';
+});
+
+$('saveEditEmpBtn').addEventListener('click', async () => {
+  const id = $('editEmpId').value;
+  const rowIndex = parseInt($('editEmpRowIndex').value, 10);
+  const name = $('editEmpName').value.trim();
+  const email = $('editEmpEmail').value.trim();
+  const department = $('editEmpDept').value;
+  const role = $('editEmpRole').value;
+
+  if (!name || !email) {
+    alert('Name and Email are required.');
+    return;
+  }
+
+  $('saveEditEmpBtn').disabled = true;
+  $('saveEditEmpBtn').textContent = 'Saving...';
+
+  try {
+    const emps = await dbListAll('Employees');
+    const matched = emps.find(e => e.employee_id === id);
+    if (matched) {
+      const updated = {
+        ...matched,
+        name: name,
+        email: email,
+        department: department,
+        role: role
+      };
+      await dbUpdate('Employees', 'employee_id', id, rowIndex, updated);
+      $('editEmpModal').style.display = 'none';
+      await refreshEmployees();
+      populateFilterDropdowns();
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('saveEditEmpBtn').disabled = false;
+    $('saveEditEmpBtn').textContent = 'Save Changes';
   }
 });
 

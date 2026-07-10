@@ -13,7 +13,8 @@ drop table if exists public.departments cascade;
 -- 2. CREATE TABLES
 create table public.departments (
     department_id text primary key,
-    department_name text not null unique
+    department_name text not null unique,
+    parent_department text references public.departments(department_name) on update cascade
 );
 
 create table public.employees (
