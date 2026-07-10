@@ -61,8 +61,7 @@ async function init() {
   $('loadingState').textContent = 'Loading configurations...';
   $('loginError').style.display = 'none';
   $('setupView').style.display = 'none';
-  $('googleSigninForm').style.display = 'none';
-  $('supabaseSigninForm').style.display = 'none';
+  $('unifiedAuthView').style.display = 'none';
   $('supabaseSignupForm').style.display = 'none';
   $('mainView').style.display = 'none';
 
@@ -227,12 +226,15 @@ async function loginWithSupabase(token, email) {
 
 // ---------- POST-LOGIN DATA PREPARATION ----------
 async function finishLoginSetup() {
+  const greetingRow = document.querySelector('.greeting-row');
+  if (greetingRow) greetingRow.style.display = 'flex';
   $('greeting').textContent = `Hi, ${currentEmployee.name}`;
   $('greeting').style.display = 'block';
   $('loadingState').style.display = 'none';
   $('mainView').style.display = 'block';
   $('resetBackendBtn').style.display = 'block';
   $('guideLink').style.display = 'inline-block';
+  $('logoutLink').style.display = 'inline-block';
 
   if (currentEmployee.role === 'admin') {
     $('adminLink').style.display = 'block';
