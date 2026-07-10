@@ -90,9 +90,7 @@ async function init() {
   }
 
   if (!backendType) {
-    // Show database setup selector
-    $('loadingState').style.display = 'none';
-    $('setupView').style.display = 'block';
+    showUnifiedLogin(null);
     return;
   }
 
@@ -105,12 +103,10 @@ async function init() {
         authToken = token;
         await loginWithSheets(token);
       } else {
-        $('loadingState').style.display = 'none';
-        $('googleSigninForm').style.display = 'block';
+        showUnifiedLogin('sheets');
       }
     } catch (err) {
-      $('loadingState').style.display = 'none';
-      $('googleSigninForm').style.display = 'block';
+      showUnifiedLogin('sheets');
     }
   } else if (backendType === 'supabase') {
     // Run Supabase auth flow
@@ -123,9 +119,38 @@ async function init() {
     if (supabaseToken && userEmail) {
       await loginWithSupabase(supabaseToken, userEmail);
     } else {
-      $('loadingState').style.display = 'none';
-      $('supabaseSigninForm').style.display = 'block';
+      showUnifiedLogin('supabase');
     }
+  }
+}
+
+function showUnifiedLogin(type) {
+  $('loadingState').style.display = 'none';
+  $('setupView').style.display = 'none';
+  $('supabaseSignupForm').style.display = 'none';
+  $('unifiedAuthView').style.display = 'block';
+
+  const inviteWrapper = $('unifiedInviteCodeWrapper');
+  const googleBtn = $('unifiedGoogleBtn');
+  const supabaseForm = $('unifiedSupabaseForm');
+
+  // Reset inputs
+  $('unifiedEmail').value = '';
+  $('unifiedPassword').value = '';
+  $('unifiedInviteInput').value = '';
+
+  if (type === 'sheets') {
+    googleBtn.style.display = 'flex';
+    supabaseForm.style.display = 'none';
+  } else if (type === 'supabase') {
+    googleBtn.style.display = 'none';
+    supabaseForm.style.display = 'block';
+    inviteWrapper.style.display = 'none'; // already configured keys!
+  } else {
+    // Fresh install, show everything
+    googleBtn.style.display = 'flex';
+    supabaseForm.style.display = 'block';
+    inviteWrapper.style.display = 'block'; // need invite code!
   }
 }
 
@@ -326,18 +351,13 @@ $('goSignUpBtn').addEventListener('click', () => {
   $('signUpPanel').style.display = 'block';
 });
 
-document.querySelectorAll('.back-to-roles').forEach(btn => {
-  btn.addEventListener('click', () => {
-    $('signInPanel').style.display = 'none';
-    $('signUpPanel').style.display = 'none';
-    $('supabaseConfigForm').style.display = 'none';
-    $('roleSelectionScreen').style.display = 'block';
-  });
-});
+// ---------- UNIFIED AUTH EVENT LISTENERS ----------
 
-$('sheetsSignInBtn').addEventListener('click', async () => {
-  $('sheetsSignInBtn').disabled = true;
-  $('sheetsSignInBtn').textContent = 'Connecting...';
+// Trigger Google Sheets login
+$('unifiedGoogleBtn').addEventListener('click', async () => {
+  $('unifiedGoogleBtn').disabled = true;
+  const originalHtml = $('unifiedGoogleBtn').innerHTML;
+  $('unifiedGoogleBtn').textContent = 'Connecting to Google...';
   try {
     await chrome.storage.local.set({ backend_type: 'sheets' });
     backendType = 'sheets';
@@ -346,25 +366,188 @@ $('sheetsSignInBtn').addEventListener('click', async () => {
     const token = await GoogleAPI.getAuthToken(true);
     authToken = token;
     
-    // Hide setup wizard
-    $('setupView').style.display = 'none';
+    // Hide auth view
+    $('unifiedAuthView').style.display = 'none';
     $('loadingState').style.display = 'block';
     await loginWithSheets(token);
   } catch (err) {
     alert(`Google Sign-In failed: ${err.message}`);
-    // Reset selection in storage so setup opens again on reload
     await chrome.storage.local.remove('backend_type');
     backendType = null;
   } finally {
-    $('sheetsSignInBtn').disabled = false;
-    $('sheetsSignInBtn').textContent = 'Sign In with Google (Sheets)';
+    $('unifiedGoogleBtn').disabled = false;
+    $('unifiedGoogleBtn').innerHTML = originalHtml;
   }
 });
 
-$('supabaseSignInBtn').addEventListener('click', () => {
-  supaMode = 'signin';
-  $('signInPanel').style.display = 'none';
-  $('supabaseConfigForm').style.display = 'block';
+// Helper: Decode and save workspace connection code
+async function connectToWorkspace(code) {
+  let connectionData;
+  try {
+    connectionData = JSON.parse(atob(code));
+  } catch (e) {
+    throw new Error('Invalid invitation code format. Please check the code.');
+  }
+
+  const url = connectionData.url;
+  const key = connectionData.key;
+
+  if (!url || !key) {
+    throw new Error('Invitation code is missing required connection fields.');
+  }
+
+  // Verify connection by hitting the Auth endpoint
+  const testRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'apikey': key,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email: 'test-connection@clockroach.com', password: 'password123' })
+  });
+
+  if (testRes.status === 400 || testRes.ok) {
+    await chrome.storage.local.set({
+      backend_type: 'supabase',
+      supabase_url: url,
+      supabase_anon_key: key
+    });
+    
+    backendType = 'supabase';
+    supabaseUrl = url;
+    supabaseAnonKey = key;
+  } else {
+    throw new Error('Workspace verification failed. Invalid invitation code.');
+  }
+}
+
+// Trigger Supabase Login
+$('unifiedSubmitBtn').addEventListener('click', async () => {
+  const email = $('unifiedEmail').value.trim();
+  const password = $('unifiedPassword').value.trim();
+
+  if (!email || !password) {
+    alert('Enter both email and password.');
+    return;
+  }
+
+  $('unifiedSubmitBtn').disabled = true;
+  $('unifiedSubmitBtn').textContent = 'Signing in...';
+
+  try {
+    // If database is not configured yet, resolve the invite code first
+    if (!backendType) {
+      const code = $('unifiedInviteInput').value.trim();
+      if (!code) {
+        throw new Error('First time logging in? Please enter the Workspace Invitation Code.');
+      }
+      await connectToWorkspace(code);
+    }
+
+    const data = await SupabaseAPI.signIn(supabaseUrl, supabaseAnonKey, email, password);
+    const token = data.access_token;
+
+    await chrome.storage.local.set({
+      supabase_token: token,
+      supabase_user_email: email
+    });
+
+    supabaseToken = token;
+    userEmail = email;
+
+    $('unifiedAuthView').style.display = 'none';
+    $('loadingState').style.display = 'block';
+    await loginWithSupabase(token, email);
+  } catch (err) {
+    alert(`Login failed: ${err.message}`);
+  } finally {
+    $('unifiedSubmitBtn').disabled = false;
+    $('unifiedSubmitBtn').textContent = 'Sign In';
+  }
+});
+
+// Trigger Supabase Signup (Registration)
+$('supaSignupBtn').addEventListener('click', async () => {
+  const name = $('supaRegName').value.trim();
+  const email = $('supaRegEmail').value.trim();
+  const password = $('supaRegPassword').value.trim();
+  const department = $('supaRegDept').value;
+
+  if (!name || !email || !password) {
+    alert('Please fill out all fields.');
+    return;
+  }
+
+  if (password.length < 6) {
+    alert('Password must be at least 6 characters.');
+    return;
+  }
+
+  $('supaSignupBtn').disabled = true;
+  $('supaSignupBtn').textContent = 'Registering...';
+
+  try {
+    // If database is not configured yet, resolve invite code first
+    if (!backendType) {
+      const code = $('unifiedRegInviteInput').value.trim();
+      if (!code) {
+        throw new Error('Please enter the Workspace Invitation Code to register.');
+      }
+      await connectToWorkspace(code);
+    }
+
+    const data = await SupabaseAPI.signUp(supabaseUrl, supabaseAnonKey, email, password, name, department);
+    
+    await chrome.storage.local.set({
+      supabase_token: data.token,
+      supabase_user_email: email
+    });
+
+    supabaseToken = data.token;
+    userEmail = email;
+
+    $('supabaseSignupForm').style.display = 'none';
+    $('loadingState').style.display = 'block';
+    await loginWithSupabase(data.token, email);
+  } catch (err) {
+    alert(`Registration failed: ${err.message}`);
+  } finally {
+    $('supaSignupBtn').disabled = false;
+    $('supaSignupBtn').textContent = 'Register & Sign In';
+  }
+});
+
+// Navigation links
+$('unifiedToRegisterLink').addEventListener('click', () => {
+  $('unifiedAuthView').style.display = 'none';
+  $('supabaseSignupForm').style.display = 'block';
+
+  // Toggle workspace code visibility during registration
+  if (!backendType) {
+    $('unifiedRegInviteCodeWrapper').style.display = 'block';
+  } else {
+    $('unifiedRegInviteCodeWrapper').style.display = 'none';
+  }
+});
+
+$('linkToSignin').addEventListener('click', () => {
+  $('supabaseSignupForm').style.display = 'none';
+  $('unifiedAuthView').style.display = 'block';
+});
+
+// Manager configuration links
+$('unifiedToSetupLink').addEventListener('click', () => {
+  $('unifiedAuthView').style.display = 'none';
+  $('setupView').style.display = 'block';
+  $('signUpPanel').style.display = 'block';
+  $('supabaseConfigForm').style.display = 'none';
+});
+
+document.querySelectorAll('.back-to-roles').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $('setupView').style.display = 'none';
+    $('unifiedAuthView').style.display = 'block';
+  });
 });
 
 $('selectSheetsBtn').addEventListener('click', async () => {
@@ -373,25 +556,22 @@ $('selectSheetsBtn').addEventListener('click', async () => {
 });
 
 $('selectSupabaseBtn').addEventListener('click', () => {
-  supaMode = 'signup';
   $('signUpPanel').style.display = 'none';
   $('supabaseConfigForm').style.display = 'block';
 });
 
 $('backToSignUpPanel').addEventListener('click', () => {
   $('supabaseConfigForm').style.display = 'none';
-  if (supaMode === 'signin') {
-    $('signInPanel').style.display = 'block';
-  } else {
-    $('signUpPanel').style.display = 'block';
-  }
+  $('signUpPanel').style.display = 'block';
 });
 
+// Save configuration (Admin only)
 $('saveSupaConfigBtn').addEventListener('click', async () => {
-  const code = $('supaInviteInput').value.trim();
+  const url = $('setupSupaUrl').value.trim();
+  const key = $('setupSupaKey').value.trim();
 
-  if (!code) {
-    alert('Please paste the workspace invitation code.');
+  if (!url || !key) {
+    alert('Please enter both Supabase URL and Anon Key.');
     return;
   }
 
@@ -399,20 +579,6 @@ $('saveSupaConfigBtn').addEventListener('click', async () => {
   $('saveSupaConfigBtn').textContent = 'Connecting...';
 
   try {
-    let connectionData;
-    try {
-      connectionData = JSON.parse(atob(code));
-    } catch (e) {
-      throw new Error('Invalid invitation code format. Please check the code.');
-    }
-
-    const url = connectionData.url;
-    const key = connectionData.key;
-
-    if (!url || !key) {
-      throw new Error('Invitation code is missing required connection fields.');
-    }
-
     // Verify connection URL and key by hitting the Auth endpoint
     const testRes = await fetch(`${url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
@@ -430,22 +596,13 @@ $('saveSupaConfigBtn').addEventListener('click', async () => {
         supabase_anon_key: key
       });
       
-      // Update variables locally
       backendType = 'supabase';
       supabaseUrl = url;
       supabaseAnonKey = key;
 
-      // Hide setup panel
       $('setupView').style.display = 'none';
-      $('loadingState').style.display = 'none';
-
-      if (supaMode === 'signin') {
-        $('supabaseSigninForm').style.display = 'block';
-        $('supabaseSignupForm').style.display = 'none';
-      } else {
-        $('supabaseSignupForm').style.display = 'block';
-        $('supabaseSigninForm').style.display = 'none';
-      }
+      $('supabaseSignupForm').style.display = 'block';
+      $('unifiedRegInviteCodeWrapper').style.display = 'none'; // already set!
     } else {
       throw new Error('Supabase authorization failed. Verify your URL and Anon Key.');
     }
@@ -467,103 +624,6 @@ $('resetBackendBtn').addEventListener('click', async () => {
       'supabase_user_email'
     ]);
     window.location.reload();
-  }
-});
-
-// ---------- AUTH ACTION HANDLERS ----------
-
-// Google Sheet Login Trigger
-$('googleSigninBtn').addEventListener('click', async () => {
-  try {
-    authToken = await GoogleAPI.getAuthToken(true);
-    await loginWithSheets(authToken);
-  } catch (err) {
-    alert(`Google Authentication failed: ${err.message}`);
-  }
-});
-
-// Supabase Navigation Toggles
-$('linkToSignup').addEventListener('click', () => {
-  $('supabaseSigninForm').style.display = 'none';
-  $('supabaseSignupForm').style.display = 'block';
-});
-
-$('linkToSignin').addEventListener('click', () => {
-  $('supabaseSignupForm').style.display = 'none';
-  $('supabaseSigninForm').style.display = 'block';
-});
-
-// Supabase Login Action
-$('supaSigninBtn').addEventListener('click', async () => {
-  const email = $('supaEmail').value.trim();
-  const password = $('supaPassword').value.trim();
-
-  if (!email || !password) {
-    alert('Enter both email and password.');
-    return;
-  }
-
-  $('supaSigninBtn').disabled = true;
-  $('supaSigninBtn').textContent = 'Signing in...';
-
-  try {
-    const data = await SupabaseAPI.signIn(supabaseUrl, supabaseAnonKey, email, password);
-    const token = data.access_token;
-
-    await chrome.storage.local.set({
-      supabase_token: token,
-      supabase_user_email: email
-    });
-
-    supabaseToken = token;
-    userEmail = email;
-
-    await loginWithSupabase(token, email);
-  } catch (err) {
-    alert(`Login failed: ${err.message}`);
-  } finally {
-    $('supaSigninBtn').disabled = false;
-    $('supaSigninBtn').textContent = 'Sign In';
-  }
-});
-
-// Supabase Signup Action
-$('supaSignupBtn').addEventListener('click', async () => {
-  const name = $('supaRegName').value.trim();
-  const email = $('supaRegEmail').value.trim();
-  const password = $('supaRegPassword').value.trim();
-  const department = $('supaRegDept').value;
-
-  if (!name || !email || !password) {
-    alert('Please fill out all fields.');
-    return;
-  }
-
-  if (password.length < 6) {
-    alert('Password must be at least 6 characters.');
-    return;
-  }
-
-  $('supaSignupBtn').disabled = true;
-  $('supaSignupBtn').textContent = 'Registering...';
-
-  try {
-    const data = await SupabaseAPI.signUp(supabaseUrl, supabaseAnonKey, email, password, name, department);
-    
-    await chrome.storage.local.set({
-      supabase_token: data.token,
-      supabase_user_email: email
-    });
-
-    supabaseToken = data.token;
-    userEmail = email;
-
-    await loginWithSupabase(data.token, email);
-  } catch (err) {
-    alert(`Registration failed: ${err.message}`);
-  } finally {
-    $('supaSignupBtn').disabled = false;
-    $('supaSignupBtn').textContent = 'Register & Sign In';
   }
 });
 
