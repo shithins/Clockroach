@@ -311,9 +311,30 @@ async function removeDept(id) {
 async function refreshEmployees() {
   const emps = await dbListAll('Employees');
   
+  // Load active tracking entries (where end_time is null or blank)
+  let activeEntries = [];
+  try {
+    if (backendType === 'supabase') {
+      activeEntries = await dbListAll('TimeEntries', 'end_time=is.null');
+    } else {
+      const all = await dbListAll('TimeEntries');
+      activeEntries = all.filter(e => !e.end_time || e.end_time === 'null' || e.end_time === '');
+    }
+  } catch (err) {
+    console.error('Failed to load active time entries:', err);
+  }
+
   // Calculate active and total employee counts
   const activeCount = emps.filter(e => String(e.active) === 'TRUE' || e.active === 'true' || e.active === true).length;
-  $('registeredEmployeesTitle').textContent = `Registered Employees (Active: ${activeCount} / Total: ${emps.length})`;
+  
+  // Count how many are currently tracking time
+  const trackingEmails = new Set(activeEntries.map(entry => String(entry.employee_email).toLowerCase()));
+  const trackingCount = emps.filter(e => {
+    const isEmpActive = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
+    return isEmpActive && trackingEmails.has(String(e.email).toLowerCase());
+  }).length;
+
+  $('registeredEmployeesTitle').textContent = `Registered Employees (Tracking: ${trackingCount} | Active: ${activeCount} / Total: ${emps.length})`;
 
   $('employeesTable').querySelector('tbody').innerHTML = emps.map(e => {
     const active = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
@@ -321,6 +342,46 @@ async function refreshEmployees() {
     const toggleText = active ? 'Deactivate' : 'Activate';
     const statusClass = active ? 'status-active' : 'status-inactive';
     const toggleBtnClass = active ? 'btn-deactivate' : 'btn-activate';
+
+    // Find if this employee is currently tracking
+    const emailLower = String(e.email).toLowerCase();
+    const trackingEntry = activeEntries.find(entry => String(entry.employee_email).toLowerCase() === emailLower);
+
+    let activityHtml = '';
+    if (active && trackingEntry) {
+      const start = new Date(trackingEntry.start_time);
+      const diffMs = Date.now() - start;
+      const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+      let durationText = '';
+      if (diffMins < 60) {
+        durationText = `${diffMins}m`;
+      } else {
+        const hrs = Math.floor(diffMins / 60);
+        const mins = diffMins % 60;
+        durationText = `${hrs}h ${mins}m`;
+      }
+      
+      activityHtml = `
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #10b981;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #10b981; animation: pulse 2s infinite;"></span>
+            <span>Tracking</span>
+            <span style="font-size: 11px; font-weight: 500; padding: 1px 5px; border-radius: 4px; background: rgba(16, 185, 129, 0.15);">${durationText}</span>
+          </div>
+          <span style="font-size: 12px; color: var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <strong>${trackingEntry.project_name || 'No Project'}</strong>: ${trackingEntry.task_description || 'No task description'}
+          </span>
+        </div>
+      `;
+    } else {
+      activityHtml = `
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-muted);">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--text-muted); opacity: 0.6;"></span>
+          <span>Offline</span>
+        </div>
+      `;
+    }
+
     return `
       <tr>
         <td style="font-weight: 600; color: var(--text-primary);">${e.name}</td>
@@ -328,6 +389,7 @@ async function refreshEmployees() {
         <td>${e.department}</td>
         <td><span class="badge" style="background-color: var(--bg-tertiary);">${e.role}</span></td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
+        <td>${activityHtml}</td>
         <td>
           <button class="btn-secondary btn-edit-emp" data-id="${e.employee_id}" style="margin-right: 4px;">Edit</button>
           <button class="btn-secondary ${toggleBtnClass}" data-id="${e.employee_id}" data-active="${!active}" style="margin-right: 4px;">${toggleText}</button>
