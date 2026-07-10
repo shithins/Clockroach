@@ -21,7 +21,7 @@ create table public.employees (
     employee_id text primary key,
     email text not null unique,
     name text not null,
-    department text references public.departments(department_name) on update cascade,
+    department text references public.departments(department_name) on update cascade on delete set null,
     role text not null check (role in ('admin', 'employee')),
     active boolean not null default true
 );
@@ -36,7 +36,7 @@ create table public.projects (
 create table public.task_presets (
     task_id text primary key,
     task_name text not null,
-    department text references public.departments(department_name) on update cascade,
+    department text references public.departments(department_name) on update cascade on delete set null,
     active boolean not null default true
 );
 
