@@ -278,7 +278,7 @@ $('addDeptBtn').addEventListener('click', async () => {
     await dbInsert('Departments', {
       department_id: newId,
       department_name: name,
-      parent_department: parent || ''
+      parent_department: parent || null
     });
     $('deptName').value = '';
     $('deptParent').value = '';
