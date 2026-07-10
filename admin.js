@@ -327,8 +327,17 @@ async function refreshEmployees() {
   // Calculate active and total employee counts
   const activeCount = emps.filter(e => String(e.active) === 'TRUE' || e.active === 'true' || e.active === true).length;
   
-  // Count how many are currently tracking time
-  const trackingEmails = new Set(activeEntries.map(entry => String(entry.employee_email).toLowerCase()));
+  // Count how many are currently tracking time (ignoring stale entries older than 16 hours)
+  const trackingEmails = new Set();
+  activeEntries.forEach(entry => {
+    const start = new Date(entry.start_time);
+    const diffMs = Date.now() - start;
+    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+    if (diffMins <= 16 * 60) {
+      trackingEmails.add(String(entry.employee_email).toLowerCase());
+    }
+  });
+
   const trackingCount = emps.filter(e => {
     const isEmpActive = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
     return isEmpActive && trackingEmails.has(String(e.email).toLowerCase());
@@ -348,10 +357,12 @@ async function refreshEmployees() {
     const trackingEntry = activeEntries.find(entry => String(entry.employee_email).toLowerCase() === emailLower);
 
     let activityHtml = '';
-    if (active && trackingEntry) {
-      const start = new Date(trackingEntry.start_time);
-      const diffMs = Date.now() - start;
-      const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+    const start = trackingEntry ? new Date(trackingEntry.start_time) : null;
+    const diffMs = start ? Date.now() - start : 0;
+    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+    const isStale = diffMins > 16 * 60; // Stale if running > 16h
+
+    if (active && trackingEntry && !isStale) {
       let durationText = '';
       if (diffMins < 60) {
         durationText = `${diffMins}m`;
@@ -390,10 +401,12 @@ async function refreshEmployees() {
         <td><span class="badge" style="background-color: var(--bg-tertiary);">${e.role}</span></td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>${activityHtml}</td>
-        <td>
-          <button class="btn-secondary btn-edit-emp" data-id="${e.employee_id}" style="margin-right: 4px;">Edit</button>
-          <button class="btn-secondary ${toggleBtnClass}" data-id="${e.employee_id}" data-active="${!active}" style="margin-right: 4px;">${toggleText}</button>
-          <button class="btn-secondary btn-delete" data-id="${e.employee_id}">Delete</button>
+        <td style="white-space: nowrap;">
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <button class="btn-secondary btn-edit-emp" data-id="${e.employee_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Edit</button>
+            <button class="btn-secondary ${toggleBtnClass}" data-id="${e.employee_id}" data-active="${!active}" style="margin: 0; padding: 6px 10px; font-size: 12px;">${toggleText}</button>
+            <button class="btn-secondary btn-delete" data-id="${e.employee_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Delete</button>
+          </div>
         </td>
       </tr>
     `;
