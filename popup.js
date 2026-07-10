@@ -460,11 +460,13 @@ $('unifiedSubmitBtn').addEventListener('click', async () => {
       await connectToWorkspace(code);
     }
 
-    let token, employee;
+    let token, refreshToken, tokenExpiry, employee;
     try {
       // Try signing in first
       const data = await SupabaseAPI.signIn(supabaseUrl, supabaseAnonKey, email, password);
       token = data.access_token;
+      refreshToken = data.refresh_token;
+      tokenExpiry = Date.now() + data.expires_in * 1000;
       
       // Load employee record to ensure they are added to DB
       const employees = await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, token, 'employees');
@@ -478,15 +480,19 @@ $('unifiedSubmitBtn').addEventListener('click', async () => {
         // Try activating account (calls signup and verifies in Employees table)
         const data = await SupabaseAPI.signUp(supabaseUrl, supabaseAnonKey, email, password, name);
         token = data.token;
+        refreshToken = data.refresh_token;
+        tokenExpiry = Date.now() + data.expires_in * 1000;
         employee = data.employee;
       } catch (signUpErr) {
         throw new Error(signUpErr.message || signInErr.message);
       }
     }
 
-    // Save token and email
+    // Save token, refresh token, expiry and email
     await chrome.storage.local.set({
       supabase_token: token,
+      supabase_refresh_token: refreshToken,
+      supabase_token_expiry: tokenExpiry,
       supabase_user_email: email
     });
 

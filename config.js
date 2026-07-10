@@ -267,7 +267,60 @@ const GoogleAPI = {
 };
 
 const SupabaseAPI = {
-  // 1. Sign in with email and password
+  // 1.a Refresh Supabase session token
+  refreshToken: async function(url, key, refreshToken) {
+    const refreshUrl = `${url}/auth/v1/token?grant_type=refresh_token`;
+    const res = await fetch(refreshUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error_description || err.error?.message || 'Failed to refresh token.');
+    }
+    
+    return await res.json();
+  },
+
+  // 1.b Verify and refresh session if expiring (internal helper)
+  verifyToken: async function(url, key, token) {
+    try {
+      const stored = await chrome.storage.local.get(['supabase_refresh_token', 'supabase_token_expiry']);
+      const expiry = stored.supabase_token_expiry || 0;
+      
+      // If expiring in less than 2 minutes (120 seconds), refresh it
+      if (stored.supabase_refresh_token && Date.now() > expiry - 120000) {
+        console.log('Clockroach: Silently refreshing database token...');
+        const refreshData = await this.refreshToken(url, key, stored.supabase_refresh_token);
+        
+        const newToken = refreshData.access_token;
+        const newExpiry = Date.now() + refreshData.expires_in * 1000;
+        
+        await chrome.storage.local.set({
+          supabase_token: newToken,
+          supabase_refresh_token: refreshData.refresh_token,
+          supabase_token_expiry: newExpiry
+        });
+        
+        // Update local global variables if active in current script context
+        if (typeof supabaseToken !== 'undefined') {
+          supabaseToken = newToken;
+        }
+        
+        return newToken;
+      }
+    } catch (err) {
+      console.error('Silently refreshing token failed:', err);
+    }
+    return token;
+  },
+
+  // 1.c Sign in with email and password
   signIn: async function(url, key, email, password) {
     const signInUrl = `${url}/auth/v1/token?grant_type=password`;
     const res = await fetch(signInUrl, {
@@ -335,7 +388,12 @@ const SupabaseAPI = {
         active: true
       };
       await this.insertRow(url, key, token, 'employees', newEmp);
-      return { token, employee: newEmp };
+      return { 
+        token, 
+        refresh_token: signupData.refresh_token, 
+        expires_in: signupData.expires_in, 
+        employee: newEmp 
+      };
     }
 
     if (!existingEmp) {
@@ -357,11 +415,17 @@ const SupabaseAPI = {
       }
     }
 
-    return { token, employee: existingEmp };
+    return { 
+      token, 
+      refresh_token: signupData.refresh_token, 
+      expires_in: signupData.expires_in, 
+      employee: existingEmp 
+    };
   },
 
   // 3. Get all rows in a table
   listAll: async function(url, key, token, table, queryParams = '') {
+    const activeToken = await this.verifyToken(url, key, token);
     let listUrl = `${url}/rest/v1/${table}?select=*`;
     if (queryParams) {
       listUrl += `&${queryParams}`;
@@ -370,7 +434,7 @@ const SupabaseAPI = {
     const res = await fetch(listUrl, {
       headers: {
         'apikey': key,
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${activeToken}`,
         'Content-Type': 'application/json'
       }
     });
@@ -385,12 +449,13 @@ const SupabaseAPI = {
 
   // 4. Insert row into table
   insertRow: async function(url, key, token, table, rowObj) {
+    const activeToken = await this.verifyToken(url, key, token);
     const insertUrl = `${url}/rest/v1/${table}`;
     const res = await fetch(insertUrl, {
       method: 'POST',
       headers: {
         'apikey': key,
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${activeToken}`,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       },
@@ -407,12 +472,13 @@ const SupabaseAPI = {
 
   // 5. Update row in table
   updateRow: async function(url, key, token, table, queryCol, queryVal, rowObj) {
+    const activeToken = await this.verifyToken(url, key, token);
     const updateUrl = `${url}/rest/v1/${table}?${queryCol}=eq.${encodeURIComponent(queryVal)}`;
     const res = await fetch(updateUrl, {
       method: 'PATCH',
       headers: {
         'apikey': key,
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${activeToken}`,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       },
@@ -429,12 +495,13 @@ const SupabaseAPI = {
 
   // 6. Delete row from table
   deleteRow: async function(url, key, token, table, queryCol, queryVal) {
+    const activeToken = await this.verifyToken(url, key, token);
     const deleteUrl = `${url}/rest/v1/${table}?${queryCol}=eq.${encodeURIComponent(queryVal)}`;
     const res = await fetch(deleteUrl, {
       method: 'DELETE',
       headers: {
         'apikey': key,
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${activeToken}`,
         'Content-Type': 'application/json'
       }
     });
