@@ -12,6 +12,13 @@ let sortAscending = false;
 
 const $ = id => document.getElementById(id);
 
+const isSheetValueActive = val => {
+  if (val === undefined || val === null || val === '') return false;
+  if (typeof val === 'boolean') return val;
+  const s = String(val).toLowerCase().trim();
+  return s === 'true' || s === 'yes' || s === 'active' || s === '1';
+};
+
 const HEADERS = {
   Employees: ['employee_id', 'email', 'name', 'department', 'role', 'active'],
   Departments: ['department_id', 'department_name', 'parent_department'],
@@ -112,7 +119,9 @@ async function init() {
       'supabase_url',
       'supabase_anon_key',
       'supabase_token',
-      'supabase_user_email'
+      'supabase_user_email',
+      'spreadsheet_id',
+      'sheets_user_email'
     ]);
 
     backendType = stored.backend_type;
@@ -140,12 +149,11 @@ async function init() {
     }
 
     if (backendType === 'sheets') {
-      // sheets verification
-      authToken = await GoogleAPI.getAuthToken(true);
-      userEmail = (await fetchUserProfile(authToken)).email;
-      spreadsheetId = await GoogleAPI.findSpreadsheet(authToken);
-      if (!spreadsheetId) {
-        alert('Spreadsheet not found. Open the Extension popup first to generate the tracker.');
+      // sheets verification via Apps Script Web App
+      spreadsheetId = stored.spreadsheet_id;
+      userEmail = stored.sheets_user_email;
+      if (!spreadsheetId || !userEmail) {
+        alert('Configuration missing. Please set up the Google Sheets Web App URL in the extension popup first.');
         return;
       }
     } else if (backendType === 'supabase') {
@@ -180,7 +188,7 @@ async function init() {
 
     // Verify user is active admin
     const employees = await dbListAll('Employees');
-    const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && (e.active === 'TRUE' || e.active === 'true' || e.active === true));
+    const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && isSheetValueActive(e.active));
     
     if (!emp || emp.role !== 'admin') {
       document.body.innerHTML = `
@@ -206,13 +214,7 @@ async function init() {
   }
 }
 
-async function fetchUserProfile(token) {
-  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!res.ok) throw new Error('Failed to load Google profile.');
-  return await res.json();
-}
+
 
 // ---------- TABS NAVIGATION ----------
 document.querySelectorAll('.tab').forEach(t => {
@@ -325,7 +327,7 @@ async function refreshEmployees() {
   }
 
   // Calculate active and total employee counts
-  const activeCount = emps.filter(e => String(e.active) === 'TRUE' || e.active === 'true' || e.active === true).length;
+  const activeCount = emps.filter(e => isSheetValueActive(e.active)).length;
   
   // Count how many are currently tracking time (ignoring stale entries older than 16 hours)
   const trackingEmails = new Set();
@@ -339,14 +341,14 @@ async function refreshEmployees() {
   });
 
   const trackingCount = emps.filter(e => {
-    const isEmpActive = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
+    const isEmpActive = isSheetValueActive(e.active);
     return isEmpActive && trackingEmails.has(String(e.email).toLowerCase());
   }).length;
 
   $('registeredEmployeesTitle').textContent = `Registered Employees (Tracking: ${trackingCount} | Active: ${activeCount} / Total: ${emps.length})`;
 
   $('employeesTable').querySelector('tbody').innerHTML = emps.map(e => {
-    const active = String(e.active) === 'TRUE' || e.active === 'true' || e.active === true;
+    const active = isSheetValueActive(e.active);
     const statusText = active ? 'Active' : 'Inactive';
     const toggleText = active ? 'Deactivate' : 'Activate';
     const statusClass = active ? 'status-active' : 'status-inactive';
@@ -479,7 +481,7 @@ async function removeEmp(id) {
 async function refreshProjects() {
   const projects = await dbListAll('Projects');
   $('projectsTable').querySelector('tbody').innerHTML = projects.map(p => {
-    const active = String(p.active) === 'TRUE' || p.active === 'true' || p.active === true;
+    const active = isSheetValueActive(p.active);
     const statusText = active ? 'Active' : 'Inactive';
     const toggleText = active ? 'Deactivate' : 'Activate';
     const statusClass = active ? 'status-active' : 'status-inactive';

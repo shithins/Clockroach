@@ -18,6 +18,13 @@ let userName = null;
 
 const $ = id => document.getElementById(id);
 
+const isSheetValueActive = val => {
+  if (val === undefined || val === null || val === '') return false;
+  if (typeof val === 'boolean') return val;
+  const s = String(val).toLowerCase().trim();
+  return s === 'true' || s === 'yes' || s === 'active' || s === '1';
+};
+
 const HEADERS = {
   Employees: ['employee_id', 'email', 'name', 'department', 'role', 'active'],
   Departments: ['department_id', 'department_name'],
@@ -70,7 +77,9 @@ async function init() {
     'supabase_url', 
     'supabase_anon_key', 
     'supabase_token', 
-    'supabase_user_email'
+    'supabase_user_email',
+    'spreadsheet_id',
+    'sheets_user_email'
   ]);
 
   backendType = stored.backend_type;
@@ -93,17 +102,14 @@ async function init() {
   }
 
   if (backendType === 'sheets') {
-    // Run Google Sheets auth flow
+    // Run Google Sheets Web App proxy flow
     $('sheetLink').style.display = 'inline-block';
-    try {
-      const token = await GoogleAPI.getAuthToken(false);
-      if (token) {
-        authToken = token;
-        await loginWithSheets(token);
-      } else {
-        showUnifiedLogin('sheets');
-      }
-    } catch (err) {
+    spreadsheetId = stored.spreadsheet_id;
+    userEmail = stored.sheets_user_email;
+
+    if (spreadsheetId && userEmail) {
+      await loginWithSheets(spreadsheetId, userEmail);
+    } else {
       showUnifiedLogin('sheets');
     }
   } else if (backendType === 'supabase') {
@@ -139,75 +145,70 @@ function showUnifiedLogin(type) {
   $('unifiedInviteInput').value = '';
   $('unifiedName').value = '';
 
+  // Google button is no longer needed
+  googleBtn.style.display = 'none';
+  $('unifiedDivider').style.display = 'none';
+
   if (type === 'sheets') {
-    googleBtn.style.display = 'flex';
-    supabaseForm.style.display = 'none';
-    $('unifiedDivider').style.display = 'none';
-  } else if (type === 'supabase') {
-    googleBtn.style.display = 'none';
     supabaseForm.style.display = 'block';
-    $('unifiedDivider').style.display = 'none';
+    inviteWrapper.style.display = 'block';
+    $('unifiedInviteInput').placeholder = 'Paste your Google Sheets Web App URL...';
+    nameWrapper.style.display = 'none';
+    $('unifiedPasswordWrapper').style.display = 'none';
+    submitBtn.textContent = 'Connect & Sign In';
+  } else if (type === 'supabase') {
+    supabaseForm.style.display = 'block';
     inviteWrapper.style.display = 'none';
     nameWrapper.style.display = 'none';
+    $('unifiedPasswordWrapper').style.display = 'block';
     submitBtn.textContent = 'Sign In';
   } else if (type === 'supabase-activation') {
-    googleBtn.style.display = 'none';
     supabaseForm.style.display = 'block';
-    $('unifiedDivider').style.display = 'none';
     inviteWrapper.style.display = 'none';
     nameWrapper.style.display = 'block';
+    $('unifiedPasswordWrapper').style.display = 'block';
     submitBtn.textContent = 'Activate & Sign In';
   } else {
     // Fresh install, show everything
-    googleBtn.style.display = 'flex';
     supabaseForm.style.display = 'block';
-    $('unifiedDivider').style.display = 'flex';
     inviteWrapper.style.display = 'block';
+    $('unifiedInviteInput').placeholder = 'Paste the invitation code or Web App URL...';
     nameWrapper.style.display = 'block';
+    $('unifiedPasswordWrapper').style.display = 'block';
     submitBtn.textContent = 'Connect & Sign In';
   }
 }
 
 // ---------- GOOGLE SHEETS LOGIN ----------
-async function loginWithSheets(token) {
+async function loginWithSheets(webAppUrl, email) {
   $('loadingState').style.display = 'block';
-  $('loadingState').textContent = 'Connecting to Google Drive...';
+  $('loadingState').textContent = 'Connecting to Google Workspace...';
 
   try {
-    const profile = await fetchUserProfile(token);
-    userEmail = profile.email;
-
-    spreadsheetId = await GoogleAPI.findSpreadsheet(token);
-    if (!spreadsheetId) {
-      $('loadingState').textContent = 'Creating Clockroach spreadsheet...';
-      spreadsheetId = await GoogleAPI.createSpreadsheet(token, userEmail);
-    }
-
     $('loadingState').textContent = 'Verifying employee status...';
-    const employees = await GoogleAPI.listAll(spreadsheetId, token, 'Employees');
-    const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && (e.active === 'TRUE' || e.active === true));
+    const employees = await GoogleAPI.listAll(webAppUrl, 'Employees');
+    const emailLower = email.toLowerCase();
+    const emp = employees.find(e => e.email.toLowerCase() === emailLower && isSheetValueActive(e.active));
 
     if (!emp) {
-      showError(`Access Denied: No active employee record found for ${userEmail}. Contact your sheet admin.`);
+      showError(`Access Denied: No active employee record found for ${email}. Contact your sheet admin.`);
       showUnifiedLogin('sheets');
       return;
     }
 
     currentEmployee = emp;
+    userEmail = email;
+    spreadsheetId = webAppUrl;
+
+    $('sheetLink').href = webAppUrl;
+
     await finishLoginSetup();
   } catch (err) {
-    showError(`Google Connection Error: ${err.message}`);
+    showError(`Connection Error: ${err.message}`);
     showUnifiedLogin('sheets');
   }
 }
 
-async function fetchUserProfile(token) {
-  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!res.ok) throw new Error('Failed to load Google profile.');
-  return await res.json();
-}
 
 // ---------- SUPABASE LOGIN ----------
 async function loginWithSupabase(token, email) {
@@ -283,7 +284,7 @@ async function finishLoginSetup() {
 
   // Filter projects by department
   activeProjects = projects.filter(p => {
-    const isActive = String(p.active) === 'TRUE' || p.active === true;
+    const isActive = isSheetValueActive(p.active);
     if (!isActive) return false;
     if (!p.department) return true; // global
     const depts = String(p.department).split(',').map(d => d.trim().toLowerCase());
@@ -299,7 +300,7 @@ async function finishLoginSetup() {
 
   // Filter tasks presets
   const deptTasks = tasks.filter(t => {
-    const isActive = String(t.active) === 'TRUE' || t.active === true;
+    const isActive = isSheetValueActive(t.active);
     return isActive && t.department === currentEmployee.department;
   });
   $('taskSuggestions').innerHTML = deptTasks.map(t => `<option value="${t.task_name}">`).join('');
@@ -353,18 +354,7 @@ function showRunningState() {
   timerInterval = setInterval(updateTimerText, 1000);
 }
 
-// ---------- WELCOME VIEW / ROLE SELECTOR HANDLERS ----------
-let supaMode = 'signup'; // 'signin' or 'signup'
 
-$('goSignInBtn').addEventListener('click', () => {
-  $('roleSelectionScreen').style.display = 'none';
-  $('signInPanel').style.display = 'block';
-});
-
-$('goSignUpBtn').addEventListener('click', () => {
-  $('roleSelectionScreen').style.display = 'none';
-  $('signUpPanel').style.display = 'block';
-});
 
 // ---------- UNIFIED AUTH EVENT LISTENERS ----------
 
@@ -441,9 +431,29 @@ $('unifiedSubmitBtn').addEventListener('click', async () => {
   const email = $('unifiedEmail').value.trim();
   const password = $('unifiedPassword').value.trim();
   const name = $('unifiedName').value.trim();
+  let code = $('unifiedInviteInput').value.trim();
 
-  if (!email || !password) {
-    alert('Enter both email and password.');
+  if (!email) {
+    alert('Please enter your email address.');
+    return;
+  }
+
+  // Auto-detect backend if not configured yet
+  let activeBackend = backendType;
+  if (!activeBackend) {
+    if (!code) {
+      alert('Please enter the Workspace Invitation Code or Web App URL.');
+      return;
+    }
+    if (code.includes('script.google.com')) {
+      activeBackend = 'sheets';
+    } else {
+      activeBackend = 'supabase';
+    }
+  }
+
+  if (activeBackend === 'supabase' && !password) {
+    alert('Please enter your password.');
     return;
   }
 
@@ -451,99 +461,253 @@ $('unifiedSubmitBtn').addEventListener('click', async () => {
   $('unifiedSubmitBtn').textContent = 'Connecting...';
 
   try {
-    // If database is not configured yet, resolve the invite code first
-    if (!backendType) {
-      const code = $('unifiedInviteInput').value.trim();
-      if (!code) {
-        throw new Error('First time logging in? Please enter the Workspace Invitation Code.');
+    if (activeBackend === 'sheets') {
+      if (!backendType) {
+        // Test connection and configure
+        await GoogleAPI.testConnection(code);
+        await chrome.storage.local.set({
+          backend_type: 'sheets',
+          spreadsheet_id: code
+        });
+        backendType = 'sheets';
+        spreadsheetId = code;
       }
-      await connectToWorkspace(code);
-    }
-
-    let token, refreshToken, tokenExpiry, employee;
-    try {
-      // Try signing in first
-      const data = await SupabaseAPI.signIn(supabaseUrl, supabaseAnonKey, email, password);
-      token = data.access_token;
-      refreshToken = data.refresh_token;
-      tokenExpiry = Date.now() + data.expires_in * 1000;
       
-      // Load employee record to ensure they are added to DB
-      const employees = await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, token, 'employees');
-      employee = employees.find(e => e.email.toLowerCase() === email.toLowerCase());
-      if (!employee) {
-        throw new Error('Your email record was not found in the database. Please contact your admin.');
+      // Save sheets email
+      await chrome.storage.local.set({
+        sheets_user_email: email
+      });
+      userEmail = email;
+
+      await loginWithSheets(spreadsheetId, email);
+    } else {
+      // Supabase flow
+      if (!backendType) {
+        await connectToWorkspace(code);
       }
-    } catch (signInErr) {
-      console.log('SignIn failed, attempting activation/signup...', signInErr);
+
+      let token, refreshToken, tokenExpiry, employee;
+      let isAuthed = false;
       try {
-        // Try activating account (calls signup and verifies in Employees table)
-        const data = await SupabaseAPI.signUp(supabaseUrl, supabaseAnonKey, email, password, name);
-        token = data.token;
+        // Try signing in first
+        const data = await SupabaseAPI.signIn(supabaseUrl, supabaseAnonKey, email, password);
+        token = data.access_token;
         refreshToken = data.refresh_token;
         tokenExpiry = Date.now() + data.expires_in * 1000;
-        employee = data.employee;
-      } catch (signUpErr) {
-        throw new Error(signUpErr.message || signInErr.message);
+        isAuthed = true;
+        
+        // Load employee record to ensure they are added to DB
+        const employees = await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, token, 'employees');
+        employee = employees.find(e => e.email.toLowerCase() === email.toLowerCase());
+        if (!employee) {
+          throw new Error('Your email record was not found in the database. Please contact your admin.');
+        }
+      } catch (signInErr) {
+        if (isAuthed) {
+          // If auth was successful but employee list check failed, don't attempt activation
+          throw signInErr;
+        }
+        
+        console.log('SignIn failed, attempting activation/signup...', signInErr);
+        try {
+          // Try activating account (calls signup and verifies in Employees table)
+          const data = await SupabaseAPI.signUp(supabaseUrl, supabaseAnonKey, email, password, name);
+          token = data.token;
+          refreshToken = data.refresh_token;
+          tokenExpiry = Date.now() + data.expires_in * 1000;
+          employee = data.employee;
+        } catch (signUpErr) {
+          // If signup fails because the user already exists in Auth, it means their password was wrong during signin
+          const msg = signUpErr.message || '';
+          if (msg.includes('already') || msg.includes('registered') || msg.includes('exists') || msg.includes('taken')) {
+            throw new Error('Invalid login credentials. Please check your password.');
+          }
+          throw new Error(signUpErr.message || signInErr.message);
+        }
       }
+
+      // Save token, refresh token, expiry and email
+      await chrome.storage.local.set({
+        supabase_token: token,
+        supabase_refresh_token: refreshToken,
+        supabase_token_expiry: tokenExpiry,
+        supabase_user_email: email
+      });
+
+      supabaseToken = token;
+      userEmail = email;
+      currentEmployee = employee;
+
+      // Login successful
+      $('unifiedAuthView').style.display = 'none';
+      $('loadingState').style.display = 'block';
+      await loginWithSupabase(token, email);
     }
-
-    // Save token, refresh token, expiry and email
-    await chrome.storage.local.set({
-      supabase_token: token,
-      supabase_refresh_token: refreshToken,
-      supabase_token_expiry: tokenExpiry,
-      supabase_user_email: email
-    });
-
-    supabaseToken = token;
-    userEmail = email;
-    currentEmployee = employee;
-
-    // Login successful
-    $('unifiedAuthView').style.display = 'none';
-    $('loadingState').style.display = 'block';
-    await loginWithSupabase(token, email);
   } catch (err) {
     alert(`Authentication failed: ${err.message}`);
-    const stored = await chrome.storage.local.get(['supabase_url']);
-    if (!stored.supabase_url) {
+    const stored = await chrome.storage.local.get(['supabase_url', 'spreadsheet_id']);
+    if (!stored.supabase_url && !stored.spreadsheet_id) {
       backendType = null;
     }
   } finally {
     $('unifiedSubmitBtn').disabled = false;
-    $('unifiedSubmitBtn').textContent = backendType === 'supabase' ? 'Sign In' : 'Connect & Sign In';
+    $('unifiedSubmitBtn').textContent = activeBackend === 'supabase' ? (backendType ? 'Sign In' : 'Connect & Sign In') : 'Connect & Sign In';
   }
 });
 
-// Manager configuration links
-$('unifiedToSetupLink').addEventListener('click', () => {
+function showSetupSubPanel(panelId) {
   $('unifiedAuthView').style.display = 'none';
   $('setupView').style.display = 'block';
-  $('signUpPanel').style.display = 'block';
-  $('supabaseConfigForm').style.display = 'none';
-});
 
-document.querySelectorAll('.back-to-roles').forEach(btn => {
-  btn.addEventListener('click', () => {
-    $('setupView').style.display = 'none';
-    $('unifiedAuthView').style.display = 'block';
+  const panels = [
+    'signUpPanel',
+    'supabaseConfigForm',
+    'sheetsConfigForm'
+  ];
+
+  panels.forEach(id => {
+    const el = $(id);
+    if (el) {
+      el.style.display = id === panelId ? 'block' : 'none';
+    }
   });
+}
+
+// Manager configuration links
+$('unifiedToSetupLink').addEventListener('click', () => {
+  showSetupSubPanel('signUpPanel');
 });
 
-$('selectSheetsBtn').addEventListener('click', async () => {
-  await chrome.storage.local.set({ backend_type: 'sheets' });
-  init();
+$('backToLoginLink').addEventListener('click', () => {
+  $('setupView').style.display = 'none';
+  showUnifiedLogin(backendType);
+});
+
+$('selectSheetsBtn').addEventListener('click', () => {
+  showSetupSubPanel('sheetsConfigForm');
 });
 
 $('selectSupabaseBtn').addEventListener('click', () => {
-  $('signUpPanel').style.display = 'none';
-  $('supabaseConfigForm').style.display = 'block';
+  showSetupSubPanel('supabaseConfigForm');
 });
 
 $('backToSignUpPanel').addEventListener('click', () => {
-  $('supabaseConfigForm').style.display = 'none';
-  $('signUpPanel').style.display = 'block';
+  showSetupSubPanel('signUpPanel');
+});
+
+$('backToSignUpPanelSheets').addEventListener('click', () => {
+  showSetupSubPanel('signUpPanel');
+});
+
+const SQL_SCHEMA = `create table public.departments (
+    department_id text primary key,
+    department_name text not null unique,
+    parent_department text references public.departments(department_name) on update cascade
+);
+
+create table public.employees (
+    employee_id text primary key,
+    email text not null unique,
+    name text not null,
+    department text references public.departments(department_name) on update cascade on delete set null,
+    role text not null check (role in ('admin', 'employee')),
+    active boolean not null default true
+);
+
+create table public.projects (
+    project_id text primary key,
+    project_name text not null,
+    department text not null,
+    active boolean not null default true
+);
+
+create table public.task_presets (
+    task_id text primary key,
+    task_name text not null,
+    department text references public.departments(department_name) on update cascade on delete set null,
+    active boolean not null default true
+);
+
+create table public.time_entries (
+    entry_id text primary key,
+    employee_email text not null references public.employees(email) on update cascade,
+    project_id text not null,
+    project_name text not null,
+    department text not null,
+    task_description text not null,
+    start_time timestamp with time zone not null,
+    end_time timestamp with time zone,
+    duration_minutes integer
+);
+
+alter table public.departments enable row level security;
+alter table public.employees enable row level security;
+alter table public.projects enable row level security;
+alter table public.task_presets enable row level security;
+alter table public.time_entries enable row level security;
+
+create or replace function public.is_admin()
+returns boolean security definer as $$
+begin
+  return exists (
+    select 1 
+    from public.employees 
+    where email = auth.jwt() ->> 'email' 
+      and role = 'admin' 
+      and active = true
+  );
+end;
+$$ language plpgsql;
+
+create policy "Allow read access to authenticated users" on public.departments for select to authenticated using (true);
+create policy "Allow admin write access" on public.departments for all to authenticated using (public.is_admin());
+
+create policy "Allow read access to authenticated employees" on public.employees for select to authenticated using (true);
+create policy "Allow registration of first user as admin" on public.employees for insert to authenticated with check (
+    (not exists (select 1 from public.employees)) or public.is_admin()
+);
+create policy "Allow admin modifications" on public.employees for update to authenticated using (public.is_admin());
+create policy "Allow admin deletes" on public.employees for delete to authenticated using (public.is_admin());
+
+create policy "Allow projects read access to authenticated" on public.projects for select to authenticated using (true);
+create policy "Allow projects admin access" on public.projects for all to authenticated using (public.is_admin());
+
+create policy "Allow tasks read access to authenticated" on public.task_presets for select to authenticated using (true);
+create policy "Allow tasks admin access" on public.task_presets for all to authenticated using (public.is_admin());
+
+create policy "Allow users to read their own entries, admins read all" on public.time_entries for select to authenticated using (
+    employee_email = auth.jwt() ->> 'email' or public.is_admin()
+);
+create policy "Allow users to log their own entries" on public.time_entries for insert to authenticated with check (
+    employee_email = auth.jwt() ->> 'email'
+);
+create policy "Allow users to update their own entries, admins update all" on public.time_entries for update to authenticated using (
+    employee_email = auth.jwt() ->> 'email' or public.is_admin()
+);
+create policy "Allow admins to delete entries" on public.time_entries for delete to authenticated using (public.is_admin());
+
+insert into public.departments (department_id, department_name) values
+('D1', 'Development'), ('D2', 'Marketing'), ('D3', 'Sales');
+
+insert into public.projects (project_id, project_name, department, active) values
+('P1', 'Project Alpha', 'Development, Marketing', true),
+('P2', 'Project Beta', 'Development', true);
+
+insert into public.task_presets (task_id, task_name, department, active) values
+('T1', 'Research', 'Development', true),
+('T2', 'Coding', 'Development', true),
+('T3', 'Design', 'Development', true);
+`;
+
+$('copySqlSchemaBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(SQL_SCHEMA).then(() => {
+    const btn = $('copySqlSchemaBtn');
+    const originalText = btn.innerHTML;
+    btn.textContent = 'Copied to Clipboard!';
+    setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+  }).catch(err => {
+    alert('Failed to copy SQL: ' + err);
+  });
 });
 
 // Save configuration (Admin only)
@@ -594,6 +758,40 @@ $('saveSupaConfigBtn').addEventListener('click', async () => {
   }
 });
 
+// Save Google Sheets configuration (Admin only)
+$('saveSheetsConfigBtn').addEventListener('click', async () => {
+  const url = $('sheetsUrlInput').value.trim();
+
+  if (!url) {
+    alert('Please enter your Google Apps Script Web App URL.');
+    return;
+  }
+
+  $('saveSheetsConfigBtn').disabled = true;
+  $('saveSheetsConfigBtn').textContent = 'Connecting...';
+
+  try {
+    // Verify connection URL by performing a test connection
+    await GoogleAPI.testConnection(url);
+
+    await chrome.storage.local.set({
+      backend_type: 'sheets',
+      spreadsheet_id: url
+    });
+    
+    backendType = 'sheets';
+    spreadsheetId = url;
+
+    $('setupView').style.display = 'none';
+    showUnifiedLogin('sheets');
+  } catch (err) {
+    alert(`Connection failed: ${err.message}`);
+  } finally {
+    $('saveSheetsConfigBtn').disabled = false;
+    $('saveSheetsConfigBtn').textContent = 'Connect & Proceed';
+  }
+});
+
 $('resetBackendBtn').addEventListener('click', async () => {
   if (confirm('Are you sure you want to reset your database backend configuration? This will sign you out.')) {
     await chrome.storage.local.remove([
@@ -623,7 +821,7 @@ $('startBtn').addEventListener('click', async () => {
     
     const newRow = {
       entry_id: entryId,
-      employee_email: userEmail,
+      employee_email: currentEmployee.email,
       project_id: projectId || 'none',
       project_name: selectedProj ? selectedProj.project_name : 'No Project',
       department: currentEmployee.department,
