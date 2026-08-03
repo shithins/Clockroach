@@ -676,13 +676,13 @@ create policy "Allow tasks read access to authenticated" on public.task_presets 
 create policy "Allow tasks admin access" on public.task_presets for all to authenticated using (public.is_admin());
 
 create policy "Allow users to read their own entries, admins read all" on public.time_entries for select to authenticated using (
-    employee_email = auth.jwt() ->> 'email' or public.is_admin()
+    lower(employee_email) = lower(auth.jwt() ->> 'email') or public.is_admin()
 );
 create policy "Allow users to log their own entries" on public.time_entries for insert to authenticated with check (
-    employee_email = auth.jwt() ->> 'email'
+    lower(employee_email) = lower(auth.jwt() ->> 'email')
 );
 create policy "Allow users to update their own entries, admins update all" on public.time_entries for update to authenticated using (
-    employee_email = auth.jwt() ->> 'email' or public.is_admin()
+    lower(employee_email) = lower(auth.jwt() ->> 'email') or public.is_admin()
 );
 create policy "Allow admins to delete entries" on public.time_entries for delete to authenticated using (public.is_admin());
 

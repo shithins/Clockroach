@@ -214,7 +214,8 @@ const SupabaseAPI = {
     
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error_description || err.error?.message || 'Failed to sign in.');
+      const msg = err.msg || err.message || err.error_description || err.error?.message || 'Failed to sign in.';
+      throw new Error(msg);
     }
     
     return await res.json();
@@ -235,7 +236,8 @@ const SupabaseAPI = {
     
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error_description || err.error?.message || 'Failed to sign up.');
+      const msg = err.msg || err.message || err.error_description || err.error?.message || 'Failed to sign up.';
+      throw new Error(msg);
     }
     
     const signupData = await res.json();
