@@ -42,7 +42,7 @@ create table public.task_presets (
 
 create table public.time_entries (
     entry_id text primary key,
-    employee_email text not null references public.employees(email) on update cascade,
+    employee_email text not null references public.employees(email) on update cascade on delete cascade,
     project_id text not null,
     project_name text not null,
     department text not null,
