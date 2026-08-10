@@ -20,10 +20,7 @@ function doGet(e) {
     }
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(table);
-    if (!sheet) {
-      throw new Error('Table "' + table + '" not found in spreadsheet');
-    }
+    const sheet = getOrCreateSheet(ss, table);
     
     const data = getSheetData(sheet);
     return ContentService.createTextOutput(JSON.stringify(data))
@@ -46,10 +43,7 @@ function doPost(e) {
     }
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(table);
-    if (!sheet) {
-      throw new Error('Table "' + table + '" not found in spreadsheet');
-    }
+    const sheet = getOrCreateSheet(ss, table);
     
     let result = null;
     if (action === 'insert') {
@@ -94,6 +88,31 @@ function insertRow(sheet, data) {
   const headers = sheet.getDataRange().getValues()[0];
   const row = headers.map(h => data[h] !== undefined ? data[h] : '');
   sheet.appendRow(row);
+
+  if (sheet.getName() === 'Employees') {
+    const email = data.email;
+    const name = data.name || 'Employee';
+    const role = data.role || 'employee';
+    if (email) {
+      try {
+        const webAppUrl = ScriptApp.getService().getUrl();
+        const subject = "Welcome to Clockroach - Your Workspace Invitation";
+        const body = "Hello " + name + ",\n\n" +
+                     "You have been invited to join the Clockroach workspace as a " + role + ".\n\n" +
+                     "To get started:\n" +
+                     "1. Install the Clockroach Chrome Extension.\n" +
+                     "2. Connect using this Workspace Invite Code (Google Web App URL):\n" +
+                     webAppUrl + "\n\n" +
+                     "3. Sign up using your email: " + email + "\n\n" +
+                     "Best regards,\n" +
+                     "Clockroach Team";
+        MailApp.sendEmail(email, subject, body);
+      } catch (mailErr) {
+        Logger.log("Failed to send welcome email: " + mailErr.message);
+      }
+    }
+  }
+
   return data;
 }
 
@@ -157,4 +176,25 @@ function deleteRow(sheet, queryCol, queryVal, rowNum) {
   
   sheet.deleteRow(targetRowIndex);
   return true;
+}
+
+function getOrCreateSheet(ss, table) {
+  let sheet = ss.getSheetByName(table);
+  if (!sheet) {
+    const knownHeaders = {
+      'Employees': ['employee_id', 'email', 'name', 'department', 'role', 'active'],
+      'Projects': ['project_id', 'project_name', 'department', 'active'],
+      'TaskPresets': ['task_id', 'task_name', 'department', 'active'],
+      'Departments': ['department_id', 'department_name', 'parent_department'],
+      'TimeEntries': ['entry_id', 'employee_email', 'project_id', 'project_name', 'department', 'task_description', 'start_time', 'end_time', 'duration_minutes'],
+      'CompanySettings': ['setting_key', 'setting_value']
+    };
+    if (knownHeaders[table]) {
+      sheet = ss.insertSheet(table);
+      sheet.appendRow(knownHeaders[table]);
+    } else {
+      throw new Error('Table "' + table + '" not found in spreadsheet');
+    }
+  }
+  return sheet;
 }

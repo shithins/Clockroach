@@ -329,6 +329,27 @@ const SupabaseAPI = {
     return await res.json();
   },
 
+  // 3.a Send password reset recovery email
+  resetPassword: async function(url, key, email) {
+    const recoverUrl = `${url}/auth/v1/recover`;
+    const res = await fetch(recoverUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      const msg = err.msg || err.message || err.error_description || err.error?.message || 'Failed to send reset email.';
+      throw new Error(msg);
+    }
+    
+    return await res.json();
+  },
+
   // 4. Insert row into table
   insertRow: async function(url, key, token, table, rowObj) {
     const activeToken = await this.verifyToken(url, key, token);

@@ -22,7 +22,7 @@ create table public.employees (
     email text not null unique,
     name text not null,
     department text references public.departments(department_name) on update cascade on delete set null,
-    role text not null check (role in ('admin', 'employee')),
+    role text not null check (role in ('admin', 'manager', 'employee')),
     active boolean not null default true
 );
 
@@ -146,3 +146,28 @@ insert into public.task_presets (task_id, task_name, department, active) values
 ('T1', 'Research', 'Development', true),
 ('T2', 'Coding', 'Development', true),
 ('T3', 'Design', 'Development', true);
+
+-- 7. COMPANY SETTINGS
+create table public.company_settings (
+    setting_key text primary key,
+    setting_value text not null
+);
+
+alter table public.company_settings enable row level security;
+
+create policy "Allow read access to all authenticated" on public.company_settings
+    for select to authenticated using (true);
+
+create policy "Allow full access to admins" on public.company_settings
+    for all to authenticated using (public.is_admin());
+
+insert into public.company_settings (setting_key, setting_value) values
+('company_name', 'My Company'),
+('notify_morning_time', '09:00'),
+('notify_morning_enabled', 'false'),
+('notify_lunch_start_time', '13:00'),
+('notify_lunch_start_enabled', 'false'),
+('notify_lunch_end_time', '14:00'),
+('notify_lunch_end_enabled', 'false'),
+('notify_evening_time', '18:00'),
+('notify_evening_enabled', 'false');

@@ -268,19 +268,47 @@ async function finishLoginSetup() {
   let tasks = [];
   let timeEntries = [];
 
-  if (backendType === 'sheets') {
-    [projects, tasks, timeEntries] = await Promise.all([
-      GoogleAPI.listAll(spreadsheetId, authToken, 'Projects'),
-      GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets'),
-      GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries')
-    ]);
-  } else if (backendType === 'supabase') {
-    [projects, tasks, timeEntries] = await Promise.all([
-      SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'projects'),
-      SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'task_presets'),
-      SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries')
-    ]);
+  let companySettings = [];
+  try {
+    if (backendType === 'sheets') {
+      [projects, tasks, timeEntries, companySettings] = await Promise.all([
+        GoogleAPI.listAll(spreadsheetId, authToken, 'Projects'),
+        GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets'),
+        GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries'),
+        GoogleAPI.listAll(spreadsheetId, authToken, 'CompanySettings')
+      ]);
+    } else if (backendType === 'supabase') {
+      [projects, tasks, timeEntries, companySettings] = await Promise.all([
+        SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'projects'),
+        SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'task_presets'),
+        SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries'),
+        SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'company_settings')
+      ]);
+    }
+  } catch (loadErr) {
+    // If table is missing, fall back to basic tables loading
+    const errMsg = loadErr.message || '';
+    if (errMsg.includes('company_settings') || errMsg.includes('CompanySettings')) {
+      console.warn('CompanySettings table is missing. Falling back to default list loading...');
+      if (backendType === 'sheets') {
+        [projects, tasks, timeEntries] = await Promise.all([
+          GoogleAPI.listAll(spreadsheetId, authToken, 'Projects'),
+          GoogleAPI.listAll(spreadsheetId, authToken, 'TaskPresets'),
+          GoogleAPI.listAll(spreadsheetId, authToken, 'TimeEntries')
+        ]);
+      } else if (backendType === 'supabase') {
+        [projects, tasks, timeEntries] = await Promise.all([
+          SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'projects'),
+          SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'task_presets'),
+          SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, 'time_entries')
+        ]);
+      }
+    } else {
+      throw loadErr;
+    }
   }
+
+  await chrome.storage.local.set({ company_settings: companySettings });
 
   // Filter projects by department
   activeProjects = projects.filter(p => {
@@ -426,6 +454,50 @@ async function connectToWorkspace(code) {
   }
 }
 
+// Send Forgot Password Reset Email
+$('forgotPasswordLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  const email = $('unifiedEmail').value.trim();
+  if (!email) {
+    alert('Please enter your email address in the Email Address field first.');
+    return;
+  }
+  
+  let activeUrl = supabaseUrl;
+  let activeKey = supabaseAnonKey;
+  
+  if (!activeUrl || !activeKey) {
+    // Try to parse from invite code input if not connected yet
+    const inviteCode = $('unifiedInviteInput').value.trim();
+    if (!inviteCode) {
+      alert('Please paste your Workspace Invitation Code first so we can locate your database.');
+      return;
+    }
+    try {
+      const decoded = JSON.parse(atob(inviteCode));
+      activeUrl = decoded.u;
+      activeKey = decoded.k;
+    } catch (err) {
+      alert('Invalid Workspace Invitation Code. Please check it and try again.');
+      return;
+    }
+  }
+  
+  const origText = $('forgotPasswordLink').textContent;
+  $('forgotPasswordLink').textContent = 'Sending...';
+  $('forgotPasswordLink').style.pointerEvents = 'none';
+  
+  try {
+    await SupabaseAPI.resetPassword(activeUrl, activeKey, email);
+    alert(`A password reset link has been sent to ${email}. Please check your email to set a new password.`);
+  } catch (err) {
+    alert(`Failed to send password reset email: ${err.message}`);
+  } finally {
+    $('forgotPasswordLink').textContent = origText;
+    $('forgotPasswordLink').style.pointerEvents = 'auto';
+  }
+});
+
 // Trigger Supabase Login & Activation
 $('unifiedSubmitBtn').addEventListener('click', async () => {
   const email = $('unifiedEmail').value.trim();
@@ -500,7 +572,21 @@ $('unifiedSubmitBtn').addEventListener('click', async () => {
         const employees = await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, token, 'employees');
         employee = employees.find(e => e.email.toLowerCase() === email.toLowerCase());
         if (!employee) {
-          throw new Error('Your email record was not found in the database. Please contact your admin.');
+          const hasActiveAdmin = employees.some(e => e.role === 'admin' && (e.active === true || e.active === 'true' || e.active === 'TRUE' || e.active === 'active'));
+          if (employees.length === 0 || !hasActiveAdmin) {
+            const employeeId = Math.random().toString(36).substring(2, 10);
+            employee = {
+              employee_id: employeeId,
+              email: email,
+              name: 'Admin Owner',
+              department: 'Development',
+              role: 'admin',
+              active: true
+            };
+            await SupabaseAPI.insertRow(supabaseUrl, supabaseAnonKey, token, 'employees', employee);
+          } else {
+            throw new Error('Your email record was not found in the database. Please contact your admin.');
+          }
         }
       } catch (signInErr) {
         if (isAuthed) {
@@ -610,7 +696,7 @@ create table public.employees (
     email text not null unique,
     name text not null,
     department text references public.departments(department_name) on update cascade on delete set null,
-    role text not null check (role in ('admin', 'employee')),
+    role text not null check (role in ('admin', 'manager', 'employee')),
     active boolean not null default true
 );
 
@@ -697,6 +783,26 @@ insert into public.task_presets (task_id, task_name, department, active) values
 ('T1', 'Research', 'Development', true),
 ('T2', 'Coding', 'Development', true),
 ('T3', 'Design', 'Development', true);
+
+create table public.company_settings (
+    setting_key text primary key,
+    setting_value text not null
+);
+
+alter table public.company_settings enable row level security;
+create policy "Allow read access to all authenticated" on public.company_settings for select to authenticated using (true);
+create policy "Allow full access to admins" on public.company_settings for all to authenticated using (public.is_admin());
+
+insert into public.company_settings (setting_key, setting_value) values
+('company_name', 'My Company'),
+('notify_morning_time', '09:00'),
+('notify_morning_enabled', 'false'),
+('notify_lunch_start_time', '13:00'),
+('notify_lunch_start_enabled', 'false'),
+('notify_lunch_end_time', '14:00'),
+('notify_lunch_end_enabled', 'false'),
+('notify_evening_time', '18:00'),
+('notify_evening_enabled', 'false');
 `;
 
 $('copySqlSchemaBtn').addEventListener('click', () => {

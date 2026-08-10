@@ -13,8 +13,8 @@
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
-  --border-color: #334155;
-  --glass-bg: rgba(30, 41, 59, 0.7);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(30, 41, 59, 0.45);
   --glass-border: rgba(255, 255, 255, 0.08);
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -43,12 +43,17 @@ body.light-theme {
 }
 
 body {
-  background-color: var(--bg-primary);
+  background: radial-gradient(circle at top left, #1e293b 0%, #0f172a 70%);
+  background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.5;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+}
+
+body.light-theme {
+  background: var(--bg-primary);
 }
 
 .container {
@@ -60,7 +65,7 @@ body {
 body.popup-body {
   width: 330px;
   min-height: auto; /* Let popup scale dynamically based on content */
-  background-color: var(--bg-primary);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
 }
 
 body.popup-body .container {

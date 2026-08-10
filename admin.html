@@ -56,6 +56,10 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             Task Presets
           </div>
+          <div class="tab" data-tab="nest">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            The Nest (Settings)
+          </div>
         </div>
         
         <!-- Workspace Invite Code -->
@@ -201,7 +205,7 @@
             </div>
             <div class="row">
               <div><label>Department</label><select id="empDept"></select></div>
-              <div><label>Role</label><select id="empRole"><option value="employee">Employee</option><option value="admin">Admin</option></select></div>
+              <div><label>Role</label><select id="empRole"><option value="employee">Employee</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
             </div>
             <button class="btn-primary" id="addEmpBtn" style="margin-top: 8px;">Add Employee</button>
           </div>
@@ -309,6 +313,132 @@
           </div>
         </div>
 
+        <!-- THE NEST (SETTINGS) -->
+        <div class="tab-content" id="tab-nest">
+          <div class="row" style="align-items: flex-start;">
+            <!-- Left Column: Company settings and notifications -->
+            <div style="flex: 1.2; display: flex; flex-direction: column; gap: 20px;">
+              
+              <div class="card">
+                <h2>Company Details</h2>
+                <div style="margin-bottom: 16px;">
+                  <label>Company / Workspace Name</label>
+                  <input type="text" id="nestCompanyName" placeholder="e.g. Acodez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                </div>
+                <button class="btn-primary" id="saveCompanyNameBtn">Save Company Name</button>
+              </div>
+
+              <div class="card">
+                <h2>Employee Invitation Settings</h2>
+                <div style="margin-bottom: 12px;">
+                  <label>Invitation Delivery Method</label>
+                  <select id="nestInviteMethod" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                    <option value="mailto">Default Mail Client (Mailto Link)</option>
+                    <option value="resend">Resend API (Fully Automated Email)</option>
+                  </select>
+                </div>
+                
+                <div id="resendConfigContainer" style="display: none; flex-direction: column; gap: 12px; margin-top: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                  <div>
+                    <label>Resend API Key</label>
+                    <input type="password" id="nestResendApiKey" placeholder="re_..." style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                  </div>
+                  <div>
+                    <label>Sender Email Address</label>
+                    <input type="email" id="nestResendSender" placeholder="onboarding@resend.dev" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 11px; display: block; margin-top: 4px;">If using a custom domain, ensure it is verified in your Resend dashboard. Otherwise, use onboarding@resend.dev.</small>
+                  </div>
+                </div>
+                
+                <button class="btn-primary" id="saveInviteSettingsBtn" style="margin-top: 12px;">Save Invitation Settings</button>
+              </div>
+
+              <div class="card">
+                <h2>Global Notification Schedule</h2>
+                <p class="status" style="margin-bottom: 16px; font-size: 12px;">Set the default reminders sent to employee extensions relative to their local timezones.</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                  <!-- Morning -->
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                    <div>
+                      <strong style="display: block; font-size: 13px;">Morning Clock-In Reminder</strong>
+                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds offline employees to start their timer.</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <input type="time" id="nestNotifyMorningTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                      <input type="checkbox" id="nestNotifyMorningEnabled" style="width: auto;">
+                    </div>
+                  </div>
+
+                  <!-- Lunch Break Start -->
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                    <div>
+                      <strong style="display: block; font-size: 13px;">Lunch Break Start</strong>
+                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds tracking employees to pause for lunch break.</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <input type="time" id="nestNotifyLunchStartTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                      <input type="checkbox" id="nestNotifyLunchStartEnabled" style="width: auto;">
+                    </div>
+                  </div>
+
+                  <!-- Lunch Break End -->
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                    <div>
+                      <strong style="display: block; font-size: 13px;">Lunch Break End</strong>
+                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds offline employees to resume tracking.</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <input type="time" id="nestNotifyLunchEndTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                      <input type="checkbox" id="nestNotifyLunchEndEnabled" style="width: auto;">
+                    </div>
+                  </div>
+
+                  <!-- Evening Stop -->
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                    <div>
+                      <strong style="display: block; font-size: 13px;">Evening Clock-Out Reminder</strong>
+                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds active employees to stop tracking when leaving.</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <input type="time" id="nestNotifyEveningTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                      <input type="checkbox" id="nestNotifyEveningEnabled" style="width: auto;">
+                    </div>
+                  </div>
+                </div>
+
+                <button class="btn-primary" id="saveNotificationsBtn" style="margin-top: 16px;">Save Notification Settings</button>
+              </div>
+
+              <div class="card" style="border: 1px solid var(--accent-rose); background: rgba(244, 63, 94, 0.02);">
+                <h2 style="color: var(--accent-rose);">Danger Zone</h2>
+                <p class="status" style="margin-bottom: 16px; font-size: 12px; color: var(--text-secondary);">Delete this entire workspace. All logged hours, departments, projects, and employee records will be permanently removed.</p>
+                <button class="btn-primary" id="deleteCompanyBtn" style="background-color: var(--accent-rose); border-color: var(--accent-rose); font-weight: 600;">Delete Company Workspace</button>
+              </div>
+
+            </div>
+
+            <!-- Right Column: Audits and Compliance -->
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+              <div class="card">
+                <h2>Tracking Compliance</h2>
+                <p class="status" style="margin-bottom: 12px; font-size: 12px;">Active employees with the lowest hours logged this week (target: 20+ hours).</p>
+                <div id="underTrackedEmployeesList" style="display: flex; flex-direction: column; gap: 10px;">
+                  <span class="status">Loading compliance logs...</span>
+                </div>
+              </div>
+
+              <div class="card">
+                <h2>Cold Projects (Stagnant)</h2>
+                <p class="status" style="margin-bottom: 12px; font-size: 12px;">Projects with the lowest or zero tracked hours recently.</p>
+                <div id="coldProjectsList" style="display: flex; flex-direction: column; gap: 10px;">
+                  <span class="status">Loading projects data...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -340,6 +470,7 @@
         <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Role</label>
         <select id="editEmpRole" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-primary);">
           <option value="employee">Employee</option>
+          <option value="manager">Manager</option>
           <option value="admin">Admin</option>
         </select>
       </div>
@@ -347,6 +478,79 @@
       <div style="display: flex; gap: 8px; margin-top: 20px;">
         <button id="saveEditEmpBtn" class="btn-primary" style="flex: 1; padding: 8px 12px; font-weight: 600;">Save Changes</button>
         <button id="cancelEditEmpBtn" class="btn-secondary" style="flex: 1; padding: 8px 12px; font-weight: 600; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">Cancel</button>
+      </div>
+    </div>
+  <!-- Edit Department Modal -->
+  <div id="editDeptModal" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.85); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-shadow: var(--shadow-lg);">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text-primary);">Edit Department</h3>
+      
+      <input type="hidden" id="editDeptRowIndex">
+      <input type="hidden" id="editDeptId">
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Department Name</label>
+        <input type="text" id="editDeptName" placeholder="e.g. Outreach" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Parent Department</label>
+        <select id="editDeptParent" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-primary);"></select>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 20px;">
+        <button id="saveEditDeptBtn" class="btn-primary" style="flex: 1; padding: 8px 12px; font-weight: 600;">Save Changes</button>
+        <button id="cancelEditDeptBtn" class="btn-secondary" style="flex: 1; padding: 8px 12px; font-weight: 600; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Project Modal -->
+  <div id="editProjModal" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.85); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-shadow: var(--shadow-lg);">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text-primary);">Edit Project</h3>
+      
+      <input type="hidden" id="editProjRowIndex">
+      <input type="hidden" id="editProjId">
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Project Name</label>
+        <input type="text" id="editProjName" placeholder="e.g. Project Alpha" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Departments (Select all that apply)</label>
+        <div id="editProjDeptsContainer" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; background: var(--bg-primary);"></div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 20px;">
+        <button id="saveEditProjBtn" class="btn-primary" style="flex: 1; padding: 8px 12px; font-weight: 600;">Save Changes</button>
+        <button id="cancelEditProjBtn" class="btn-secondary" style="flex: 1; padding: 8px 12px; font-weight: 600; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Task Modal -->
+  <div id="editTaskModal" style="display:none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.85); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-shadow: var(--shadow-lg);">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text-primary);">Edit Task Preset</h3>
+      
+      <input type="hidden" id="editTaskRowIndex">
+      <input type="hidden" id="editTaskId">
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Task Preset Name</label>
+        <input type="text" id="editTaskName" placeholder="e.g. Code Review" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">Department</label>
+        <select id="editTaskDept" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-primary);"></select>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 20px;">
+        <button id="saveEditTaskBtn" class="btn-primary" style="flex: 1; padding: 8px 12px; font-weight: 600;">Save Changes</button>
+        <button id="cancelEditTaskBtn" class="btn-secondary" style="flex: 1; padding: 8px 12px; font-weight: 600; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">Cancel</button>
       </div>
     </div>
   </div>

@@ -6,6 +6,7 @@ let supabaseToken = null;
 let authToken = null;
 let spreadsheetId = null;
 let userEmail = null;
+let currentEmployee = null;
 let currentReportEntries = [];
 let sortField = 'date';
 let sortAscending = false;
@@ -24,7 +25,8 @@ const HEADERS = {
   Departments: ['department_id', 'department_name', 'parent_department'],
   Projects: ['project_id', 'project_name', 'department', 'active'],
   TaskPresets: ['task_id', 'task_name', 'department', 'active'],
-  TimeEntries: ['entry_id', 'employee_email', 'project_id', 'project_name', 'department', 'task_description', 'start_time', 'end_time', 'duration_minutes']
+  TimeEntries: ['entry_id', 'employee_email', 'project_id', 'project_name', 'department', 'task_description', 'start_time', 'end_time', 'duration_minutes'],
+  CompanySettings: ['setting_key', 'setting_value']
 };
 
 // ---------- THEME WORK ----------
@@ -64,17 +66,18 @@ function getTableName(sheetName) {
     'Employees': 'employees',
     'Projects': 'projects',
     'TaskPresets': 'task_presets',
-    'TimeEntries': 'time_entries'
+    'TimeEntries': 'time_entries',
+    'CompanySettings': 'company_settings'
   };
   return mapping[sheetName];
 }
 
-async function dbListAll(sheetName) {
+async function dbListAll(sheetName, queryParams = '') {
   if (backendType === 'sheets') {
     return await GoogleAPI.listAll(spreadsheetId, authToken, sheetName);
   } else {
     const tableName = getTableName(sheetName);
-    return await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, tableName);
+    return await SupabaseAPI.listAll(supabaseUrl, supabaseAnonKey, supabaseToken, tableName, queryParams);
   }
 }
 
@@ -186,18 +189,26 @@ async function init() {
       }
     }
 
-    // Verify user is active admin
+    // Verify user is active admin or manager
     const employees = await dbListAll('Employees');
     const emp = employees.find(e => e.email.toLowerCase() === userEmail.toLowerCase() && isSheetValueActive(e.active));
     
-    if (!emp || emp.role !== 'admin') {
+    if (!emp || (emp.role !== 'admin' && emp.role !== 'manager')) {
       document.body.innerHTML = `
         <div class="container" style="text-align: center; margin-top: 100px;">
           <h2>Access Denied</h2>
-          <p>You must be registered as an "admin" in the employees list to access this dashboard.</p>
+          <p>You must be registered as an "admin" or a "manager" in the employees list to access this dashboard.</p>
         </div>
       `;
       return;
+    }
+
+    currentEmployee = emp;
+
+    // Hide The Nest tab for managers
+    if (currentEmployee.role !== 'admin') {
+      const nestTab = document.querySelector('.tab[data-tab="nest"]');
+      if (nestTab) nestTab.style.display = 'none';
     }
 
     // Refresh lists
@@ -224,6 +235,10 @@ document.querySelectorAll('.tab').forEach(t => {
     
     t.classList.add('active');
     $(t.dataset.tab ? `tab-${t.dataset.tab}` : '').classList.add('active');
+    
+    if (t.dataset.tab === 'nest') {
+      refreshNestTab();
+    }
   });
 });
 
@@ -259,11 +274,22 @@ async function refreshDepartments() {
   `).join('');
   $('projDeptsContainer').innerHTML = deptCheckboxes || '<span class="status">No departments available</span>';
 
-  $('departmentsTable').querySelector('tbody').innerHTML = formattedDepts.map(d => `
+  let filteredDepts = formattedDepts;
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    filteredDepts = formattedDepts.filter(d => d.name.toLowerCase() === mgrDept);
+  }
+
+  $('departmentsTable').querySelector('tbody').innerHTML = filteredDepts.map(d => `
     <tr>
       <td style="font-weight: 500;">${d.name}</td>
       <td>${d.parent ? `<span class="badge" style="background-color: var(--bg-tertiary);">${d.parent}</span>` : '<span style="color: var(--text-muted); font-size: 12px;">None (Root)</span>'}</td>
-      <td><button class="btn-secondary btn-delete" data-id="${d.id}">Delete</button></td>
+      <td>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button class="btn-secondary btn-edit-dept" data-id="${d.id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Edit</button>
+          <button class="btn-secondary btn-delete" data-id="${d.id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Delete</button>
+        </div>
+      </td>
     </tr>
   `).join('');
 }
@@ -311,7 +337,11 @@ async function removeDept(id) {
 
 // ---------- EMPLOYEES ----------
 async function refreshEmployees() {
-  const emps = await dbListAll('Employees');
+  let emps = await dbListAll('Employees');
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    emps = emps.filter(e => String(e.department).toLowerCase() === mgrDept);
+  }
   
   // Load active tracking entries (where end_time is null or blank)
   let activeEntries = [];
@@ -405,6 +435,7 @@ async function refreshEmployees() {
         <td>${activityHtml}</td>
         <td style="white-space: nowrap;">
           <div style="display: flex; gap: 4px; align-items: center;">
+            ${active && trackingEntry && !isStale ? `<button class="btn-secondary btn-stop-timer" data-email="${e.email}" style="margin: 0; padding: 6px 10px; font-size: 12px; border-color: var(--accent-rose); color: var(--accent-rose); background: rgba(244, 63, 94, 0.05);">Stop Timer</button>` : ''}
             <button class="btn-secondary btn-edit-emp" data-id="${e.employee_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Edit</button>
             <button class="btn-secondary ${toggleBtnClass}" data-id="${e.employee_id}" data-active="${!active}" style="margin: 0; padding: 6px 10px; font-size: 12px;">${toggleText}</button>
             <button class="btn-secondary btn-delete" data-id="${e.employee_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Delete</button>
@@ -436,6 +467,8 @@ async function toggleEmpActive(id, activeState) {
 $('addEmpBtn').addEventListener('click', async () => {
   const email = $('empEmail').value.trim();
   const name = $('empName').value.trim();
+  const dept = $('empDept').value;
+  const role = $('empRole').value;
   if (!email || !name) { alert('Email and name are required.'); return; }
   
   const newId = Math.random().toString(36).substring(2, 10);
@@ -446,14 +479,89 @@ $('addEmpBtn').addEventListener('click', async () => {
       employee_id: newId,
       email: email,
       name: name,
-      department: $('empDept').value,
-      role: $('empRole').value,
+      department: dept,
+      role: role,
       active: true
     });
+    
     $('empEmail').value = '';
     $('empName').value = '';
     await refreshEmployees();
     populateFilterDropdowns();
+
+    // Trigger Invitation Delivery (Only for Supabase; Sheets is fully handled on Apps Script backend)
+    if (backendType === 'supabase') {
+      try {
+        const settings = await dbListAll('CompanySettings');
+        const getSettingVal = key => (settings.find(s => s.setting_key === key) || {}).setting_value || '';
+        
+        const method = getSettingVal('invitation_method') || 'mailto';
+        const inviteCode = $('supaInviteCode').textContent || '';
+        
+        if (method === 'mailto') {
+          const subject = encodeURIComponent("Welcome to Clockroach - Workspace Invitation");
+          const body = encodeURIComponent(
+            `Hello ${name},\n\n` +
+            `You have been invited to join our Clockroach workspace as a ${role}.\n\n` +
+            `To get started:\n` +
+            `1. Install the Clockroach Chrome Extension.\n` +
+            `2. Connect using this Workspace Invite Code:\n` +
+            `${inviteCode}\n\n` +
+            `3. Sign up using your email: ${email}\n\n` +
+            `Best regards,\n` +
+            `Management`
+          );
+          window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+        } else if (method === 'resend') {
+          const apiKey = getSettingVal('resend_api_key');
+          const sender = getSettingVal('resend_sender') || 'onboarding@resend.dev';
+          
+          if (!apiKey) {
+            alert('Resend API key is not configured. Please set it up in "The Nest" tab settings.');
+          } else {
+            const emailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                from: `Clockroach Onboarding <${sender}>`,
+                to: [email],
+                subject: 'Welcome to Clockroach - Workspace Invitation',
+                html: `
+                  <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #0f172a;">Welcome to Clockroach!</h2>
+                    <p>Hello <strong>${name}</strong>,</p>
+                    <p>You have been invited to join our Clockroach workspace as a <strong>${role}</strong>.</p>
+                    <p>To get started, follow these simple steps:</p>
+                    <ol style="line-height: 1.6;">
+                      <li>Install the Clockroach Chrome Extension.</li>
+                      <li>When prompted, paste this Workspace Invitation Code:
+                        <div style="background: #f1f5f9; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 11px; word-break: break-all; margin: 8px 0; border: 1px solid #cbd5e1;">
+                          ${inviteCode}
+                        </div>
+                      </li>
+                      <li>Sign up using your email: <strong>${email}</strong></li>
+                    </ol>
+                    <p style="margin-top: 24px; font-size: 13px; color: #64748b;">If you have any questions, contact your workspace administrator.</p>
+                  </div>
+                `
+              })
+            });
+            if (emailRes.ok) {
+              alert(`Employee added, and invitation email sent automatically to ${email} via Resend!`);
+            } else {
+              const errJson = await emailRes.json();
+              alert(`Employee added, but failed to send automated email: ${errJson.message || 'Unknown error'}`);
+            }
+          }
+        }
+      } catch (inviteErr) {
+        console.error('Failed to trigger invite delivery:', inviteErr);
+        alert(`Employee registered, but failed to dispatch email: ${inviteErr.message}`);
+      }
+    }
   } catch (err) {
     alert(`Error: ${err.message}`);
   } finally {
@@ -479,7 +587,15 @@ async function removeEmp(id) {
 
 // ---------- PROJECTS ----------
 async function refreshProjects() {
-  const projects = await dbListAll('Projects');
+  let projects = await dbListAll('Projects');
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    projects = projects.filter(p => {
+      if (!p.department) return false;
+      const depts = String(p.department).split(',').map(d => d.trim().toLowerCase());
+      return depts.includes(mgrDept);
+    });
+  }
   $('projectsTable').querySelector('tbody').innerHTML = projects.map(p => {
     const active = isSheetValueActive(p.active);
     const statusText = active ? 'Active' : 'Inactive';
@@ -492,8 +608,11 @@ async function refreshProjects() {
         <td>${p.department}</td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>
-          <button class="btn-secondary ${toggleBtnClass}" data-id="${p.project_id}" data-active="${!active}">${toggleText}</button>
-          <button class="btn-secondary btn-delete" data-id="${p.project_id}">Delete</button>
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <button class="btn-secondary btn-edit-proj" data-id="${p.project_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Edit</button>
+            <button class="btn-secondary ${toggleBtnClass}" data-id="${p.project_id}" data-active="${!active}" style="margin: 0; padding: 6px 10px; font-size: 12px;">${toggleText}</button>
+            <button class="btn-secondary btn-delete" data-id="${p.project_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Delete</button>
+          </div>
         </td>
       </tr>
     `;
@@ -569,12 +688,21 @@ async function removeProj(id) {
 
 // ---------- TASK PRESETS ----------
 async function refreshTasks() {
-  const tasks = await dbListAll('TaskPresets');
+  let tasks = await dbListAll('TaskPresets');
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    tasks = tasks.filter(t => String(t.department).toLowerCase() === mgrDept);
+  }
   $('tasksTable').querySelector('tbody').innerHTML = tasks.map(t => `
     <tr>
       <td>${t.task_name}</td>
       <td>${t.department}</td>
-      <td><button class="btn-secondary btn-delete" data-id="${t.task_id}">Delete</button></td>
+      <td>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button class="btn-secondary btn-edit-task" data-id="${t.task_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Edit</button>
+          <button class="btn-secondary btn-delete" data-id="${t.task_id}" style="margin: 0; padding: 6px 10px; font-size: 12px;">Delete</button>
+        </div>
+      </td>
     </tr>
   `).join('');
 }
@@ -677,9 +805,13 @@ async function runReport() {
   $('totalHoursLabel').textContent = 'Loading Report...';
   
   try {
-    // 1. Fetch completed entries
     const allEntries = await dbListAll('TimeEntries');
     let entries = allEntries.filter(e => e.end_time); // completed only
+
+    if (currentEmployee && currentEmployee.role === 'manager') {
+      const mgrDept = String(currentEmployee.department).toLowerCase();
+      entries = entries.filter(e => String(e.department).toLowerCase() === mgrDept);
+    }
     
     // 2. Apply filters client-side
     if (filterEmployee) {
@@ -997,6 +1129,8 @@ $('departmentsTable').querySelector('tbody').addEventListener('click', async (e)
   const id = btn.dataset.id;
   if (btn.classList.contains('btn-delete')) {
     await removeDept(id);
+  } else if (btn.classList.contains('btn-edit-dept')) {
+    await openEditDeptModal(id);
   }
 });
 
@@ -1011,6 +1145,9 @@ $('employeesTable').querySelector('tbody').addEventListener('click', async (e) =
     await toggleEmpActive(id, activeState);
   } else if (btn.classList.contains('btn-edit-emp')) {
     await openEditEmpModal(id);
+  } else if (btn.classList.contains('btn-stop-timer')) {
+    const email = btn.dataset.email;
+    await stopEmployeeTimer(email);
   }
 });
 
@@ -1023,6 +1160,8 @@ $('projectsTable').querySelector('tbody').addEventListener('click', async (e) =>
   } else if (btn.classList.contains('btn-activate') || btn.classList.contains('btn-deactivate')) {
     const activeState = btn.dataset.active === 'true';
     await toggleProjActive(id, activeState);
+  } else if (btn.classList.contains('btn-edit-proj')) {
+    await openEditProjModal(id);
   }
 });
 
@@ -1104,6 +1243,497 @@ $('saveEditEmpBtn').addEventListener('click', async () => {
   } finally {
     $('saveEditEmpBtn').disabled = false;
     $('saveEditEmpBtn').textContent = 'Save Changes';
+  }
+});
+
+// ---------- STOP EMPLOYEE TIMER ----------
+async function stopEmployeeTimer(email) {
+  if (!confirm(`Are you sure you want to stop the active timer for ${email}?`)) {
+    return;
+  }
+  try {
+    let activeEntries = [];
+    if (backendType === 'supabase') {
+      activeEntries = await dbListAll('TimeEntries', 'end_time=is.null');
+    } else {
+      const all = await dbListAll('TimeEntries');
+      activeEntries = all.filter(e => !e.end_time || e.end_time === 'null' || e.end_time === '');
+    }
+
+    const emailLower = email.toLowerCase();
+    const entry = activeEntries.find(e => String(e.employee_email).toLowerCase() === emailLower);
+
+    if (!entry) {
+      alert('No running timer found for this employee.');
+      return;
+    }
+
+    const startTime = new Date(entry.start_time);
+    const endTime = new Date();
+    const durationMinutes = Math.round((endTime - startTime) / 60000);
+
+    const updated = {
+      ...entry,
+      end_time: endTime.toISOString(),
+      duration_minutes: durationMinutes
+    };
+
+    await dbUpdate('TimeEntries', 'entry_id', entry.entry_id, entry._rowNum, updated);
+    alert('Timer stopped successfully.');
+    await refreshEmployees();
+    runReport();
+  } catch (err) {
+    alert(`Error stopping timer: ${err.message}`);
+  }
+}
+
+// ---------- EDIT DEPARTMENT MODAL HANDLERS ----------
+async function openEditDeptModal(id) {
+  const depts = await dbListAll('Departments');
+  const matched = depts.find(d => d.department_id === id);
+  if (!matched) return;
+
+  $('editDeptId').value = id;
+  $('editDeptRowIndex').value = matched._rowNum || '';
+  $('editDeptName').value = matched.department_name;
+
+  // Populate parents dropdown excluding itself to prevent loops
+  const otherDepts = depts.filter(d => d.department_id !== id && !d.parent_department);
+  $('editDeptParent').innerHTML = '<option value="">-- No Parent (Root Department) --</option>' +
+    otherDepts.map(d => `<option value="${d.department_name}">${d.department_name}</option>`).join('');
+  
+  $('editDeptParent').value = matched.parent_department || '';
+  $('editDeptModal').style.display = 'flex';
+}
+
+$('cancelEditDeptBtn').addEventListener('click', () => {
+  $('editDeptModal').style.display = 'none';
+});
+
+$('saveEditDeptBtn').addEventListener('click', async () => {
+  const id = $('editDeptId').value;
+  const rowIndex = parseInt($('editDeptRowIndex').value, 10);
+  const name = $('editDeptName').value.trim();
+  const parent = $('editDeptParent').value;
+
+  if (!name) {
+    alert('Department name is required.');
+    return;
+  }
+
+  $('saveEditDeptBtn').disabled = true;
+  $('saveEditDeptBtn').textContent = 'Saving...';
+
+  try {
+    const depts = await dbListAll('Departments');
+    const matched = depts.find(d => d.department_id === id);
+    if (matched) {
+      const updated = {
+        ...matched,
+        department_name: name,
+        parent_department: parent || null
+      };
+      await dbUpdate('Departments', 'department_id', id, rowIndex, updated);
+      $('editDeptModal').style.display = 'none';
+      await refreshDepartments();
+      await populateFilterDropdowns();
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('saveEditDeptBtn').disabled = false;
+    $('saveEditDeptBtn').textContent = 'Save Changes';
+  }
+});
+
+// ---------- EDIT PROJECT MODAL HANDLERS ----------
+async function openEditProjModal(id) {
+  const projects = await dbListAll('Projects');
+  const matched = projects.find(p => p.project_id === id);
+  if (!matched) return;
+
+  $('editProjId').value = id;
+  $('editProjRowIndex').value = matched._rowNum || '';
+  $('editProjName').value = matched.project_name;
+
+  // Render department checkboxes in project edit modal
+  const depts = await dbListAll('Departments');
+  const formattedDepts = depts.map(d => {
+    return {
+      name: d.department_name,
+      displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
+    };
+  }).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const matchedDepts = String(matched.department).split(',').map(d => d.trim().toLowerCase());
+
+  const checkboxes = formattedDepts.map(d => {
+    const isChecked = matchedDepts.includes(d.name.toLowerCase()) ? 'checked' : '';
+    return `
+      <label style="display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; font-weight: normal; text-transform: none;">
+        <input type="checkbox" name="editProjDeptCheck" value="${d.name}" ${isChecked} style="width: auto;">
+        <span>${d.displayName}</span>
+      </label>
+    `;
+  }).join('');
+
+  $('editProjDeptsContainer').innerHTML = checkboxes || '<span class="status">No departments available</span>';
+  $('editProjModal').style.display = 'flex';
+}
+
+$('cancelEditProjBtn').addEventListener('click', () => {
+  $('editProjModal').style.display = 'none';
+});
+
+$('saveEditProjBtn').addEventListener('click', async () => {
+  const id = $('editProjId').value;
+  const rowIndex = parseInt($('editProjRowIndex').value, 10);
+  const name = $('editProjName').value.trim();
+
+  if (!name) {
+    alert('Project name is required.');
+    return;
+  }
+
+  const checkedDepts = Array.from($('editProjDeptsContainer').querySelectorAll('input[name="editProjDeptCheck"]:checked')).map(cb => cb.value);
+  if (checkedDepts.length === 0) {
+    alert('Please select at least one department for the project.');
+    return;
+  }
+
+  $('saveEditProjBtn').disabled = true;
+  $('saveEditProjBtn').textContent = 'Saving...';
+
+  try {
+    const projects = await dbListAll('Projects');
+    const matched = projects.find(p => p.project_id === id);
+    if (matched) {
+      const updated = {
+        ...matched,
+        project_name: name,
+        department: checkedDepts.join(', ')
+      };
+      await dbUpdate('Projects', 'project_id', id, rowIndex, updated);
+      $('editProjModal').style.display = 'none';
+      await refreshProjects();
+      populateFilterDropdowns();
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('saveEditProjBtn').disabled = false;
+    $('saveEditProjBtn').textContent = 'Save Changes';
+  }
+});
+
+// ---------- EDIT TASK PRESET MODAL HANDLERS ----------
+async function openEditTaskModal(id) {
+  const tasks = await dbListAll('TaskPresets');
+  const matched = tasks.find(t => t.task_id === id);
+  if (!matched) return;
+
+  $('editTaskId').value = id;
+  $('editTaskRowIndex').value = matched._rowNum || '';
+  $('editTaskName').value = matched.task_name;
+
+  // Populate departments dropdown
+  const depts = await dbListAll('Departments');
+  const formattedDepts = depts.map(d => {
+    return {
+      name: d.department_name,
+      displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
+    };
+  }).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const options = formattedDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
+  $('editTaskDept').innerHTML = options;
+  $('editTaskDept').value = matched.department;
+
+  $('editTaskModal').style.display = 'flex';
+}
+
+$('cancelEditTaskBtn').addEventListener('click', () => {
+  $('editTaskModal').style.display = 'none';
+});
+
+$('saveEditTaskBtn').addEventListener('click', async () => {
+  const id = $('editTaskId').value;
+  const rowIndex = parseInt($('editTaskRowIndex').value, 10);
+  const name = $('editTaskName').value.trim();
+  const department = $('editTaskDept').value;
+
+  if (!name) {
+    alert('Task name is required.');
+    return;
+  }
+
+  $('saveEditTaskBtn').disabled = true;
+  $('saveEditTaskBtn').textContent = 'Saving...';
+
+  try {
+    const tasks = await dbListAll('TaskPresets');
+    const matched = tasks.find(t => t.task_id === id);
+    if (matched) {
+      const updated = {
+        ...matched,
+        task_name: name,
+        department: department
+      };
+      await dbUpdate('TaskPresets', 'task_id', id, rowIndex, updated);
+      $('editTaskModal').style.display = 'none';
+      await refreshTasks();
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    $('saveEditTaskBtn').disabled = false;
+    $('saveEditTaskBtn').textContent = 'Save Changes';
+  }
+});
+
+// ---------- THE NEST (SETTINGS & COMPLIANCE) ----------
+async function getCompanySetting(settings, key, defaultVal = '') {
+  const found = settings.find(s => s.setting_key === key);
+  return found ? found.setting_value : defaultVal;
+}
+
+async function setCompanySetting(key, val) {
+  try {
+    const settings = await dbListAll('CompanySettings');
+    const found = settings.find(s => s.setting_key === key);
+    if (found) {
+      await dbUpdate('CompanySettings', 'setting_key', key, found._rowNum, { setting_key: key, setting_value: String(val) });
+    } else {
+      await dbInsert('CompanySettings', { setting_key: key, setting_value: String(val) });
+    }
+  } catch (e) {
+    console.error(`Failed to update setting ${key}:`, e);
+    throw e;
+  }
+}
+
+async function refreshNestTab() {
+  if (currentEmployee.role !== 'admin') return;
+
+  $('saveCompanyNameBtn').disabled = true;
+  $('saveNotificationsBtn').disabled = true;
+
+  try {
+    const settings = await dbListAll('CompanySettings');
+    const getVal = key => {
+      const found = settings.find(s => s.setting_key === key);
+      return found ? found.setting_value : '';
+    };
+
+    $('nestCompanyName').value = getVal('company_name') || 'My Company';
+
+    $('nestNotifyMorningTime').value = getVal('notify_morning_time') || '09:00';
+    $('nestNotifyMorningEnabled').checked = getVal('notify_morning_enabled') === 'true';
+
+    $('nestNotifyLunchStartTime').value = getVal('notify_lunch_start_time') || '13:00';
+    $('nestNotifyLunchStartEnabled').checked = getVal('notify_lunch_start_enabled') === 'true';
+
+    $('nestNotifyLunchEndTime').value = getVal('notify_lunch_end_time') || '14:00';
+    $('nestNotifyLunchEndEnabled').checked = getVal('notify_lunch_end_enabled') === 'true';
+
+    $('nestNotifyEveningTime').value = getVal('notify_evening_time') || '18:00';
+    $('nestNotifyEveningEnabled').checked = getVal('notify_evening_enabled') === 'true';
+
+    $('nestInviteMethod').value = getVal('invitation_method') || 'mailto';
+    $('resendConfigContainer').style.display = $('nestInviteMethod').value === 'resend' ? 'flex' : 'none';
+    $('nestResendApiKey').value = getVal('resend_api_key') || '';
+    $('nestResendSender').value = getVal('resend_sender') || 'onboarding@resend.dev';
+
+    await loadNestComplianceData();
+  } catch (e) {
+    console.error('Failed to load settings in Nest:', e);
+  } finally {
+    $('saveCompanyNameBtn').disabled = false;
+    $('saveNotificationsBtn').disabled = false;
+  }
+}
+
+async function loadNestComplianceData() {
+  try {
+    const [emps, projects, entries] = await Promise.all([
+      dbListAll('Employees'),
+      dbListAll('Projects'),
+      dbListAll('TimeEntries')
+    ]);
+
+    // Monday of current week
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const startOfWeek = new Date(now.setDate(diff));
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const thisWeeksEntries = entries.filter(e => new Date(e.start_time) >= startOfWeek && e.end_time);
+
+    const empHours = {};
+    emps.forEach(e => {
+      if (isSheetValueActive(e.active) && e.role !== 'admin') {
+        empHours[e.email.toLowerCase()] = { name: e.name, hours: 0 };
+      }
+    });
+
+    thisWeeksEntries.forEach(entry => {
+      const email = entry.employee_email.toLowerCase();
+      if (empHours[email]) {
+        empHours[email].hours += Number(entry.duration_minutes || 0) / 60;
+      }
+    });
+
+    const sortedEmps = Object.values(empHours)
+      .sort((a, b) => a.hours - b.hours)
+      .slice(0, 5);
+
+    $('underTrackedEmployeesList').innerHTML = sortedEmps.map(eh => {
+      const hours = Math.round(eh.hours * 10) / 10;
+      const percent = Math.min(100, Math.round((hours / 20) * 100));
+      const progressColor = percent < 40 ? 'var(--accent-rose)' : percent < 80 ? 'var(--accent-orange)' : '#10b981';
+      return `
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 2px;">
+            <span>${eh.name}</span>
+            <span>${hours}h / 20h</span>
+          </div>
+          <div style="width: 100%; height: 8px; border-radius: 4px; background: var(--bg-primary); overflow: hidden;">
+            <div style="width: ${percent}%; height: 100%; background: ${progressColor};"></div>
+          </div>
+        </div>
+      `;
+    }).join('') || '<span class="status">All employees are tracking correctly!</span>';
+
+    const projHours = {};
+    projects.forEach(p => {
+      if (isSheetValueActive(p.active)) {
+        projHours[p.project_id] = { name: p.project_name, hours: 0 };
+      }
+    });
+
+    thisWeeksEntries.forEach(entry => {
+      const pid = entry.project_id;
+      if (projHours[pid]) {
+        projHours[pid].hours += Number(entry.duration_minutes || 0) / 60;
+      }
+    });
+
+    const sortedProjs = Object.values(projHours)
+      .sort((a, b) => a.hours - b.hours)
+      .slice(0, 5);
+
+    $('coldProjectsList').innerHTML = sortedProjs.map(ph => {
+      const hours = Math.round(ph.hours * 10) / 10;
+      return `
+        <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; border-bottom: 1px dashed var(--border-color); padding-bottom: 6px;">
+          <span style="font-weight: 600; color: var(--text-primary);">${ph.name}</span>
+          <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(244, 63, 94, 0.08); color: var(--accent-rose); font-weight: 600;">${hours} hours logged</span>
+        </div>
+      `;
+    }).join('') || '<span class="status">No active projects.</span>';
+
+  } catch (e) {
+    console.error('Failed to load compliance data:', e);
+    $('underTrackedEmployeesList').innerHTML = '<span class="status">Failed to calculate compliance logs.</span>';
+    $('coldProjectsList').innerHTML = '<span class="status">Failed to load projects data.</span>';
+  }
+}
+
+$('saveCompanyNameBtn').addEventListener('click', async () => {
+  const name = $('nestCompanyName').value.trim();
+  if (!name) return;
+  $('saveCompanyNameBtn').disabled = true;
+  $('saveCompanyNameBtn').textContent = 'Saving...';
+  try {
+    await setCompanySetting('company_name', name);
+    alert('Company Name saved successfully.');
+  } catch (err) {
+    alert(`Error saving company name: ${err.message}`);
+  } finally {
+    $('saveCompanyNameBtn').disabled = false;
+    $('saveCompanyNameBtn').textContent = 'Save Company Name';
+  }
+});
+
+$('saveNotificationsBtn').addEventListener('click', async () => {
+  $('saveNotificationsBtn').disabled = true;
+  $('saveNotificationsBtn').textContent = 'Saving...';
+  try {
+    await setCompanySetting('notify_morning_time', $('nestNotifyMorningTime').value);
+    await setCompanySetting('notify_morning_enabled', $('nestNotifyMorningEnabled').checked);
+
+    await setCompanySetting('notify_lunch_start_time', $('nestNotifyLunchStartTime').value);
+    await setCompanySetting('notify_lunch_start_enabled', $('nestNotifyLunchStartEnabled').checked);
+
+    await setCompanySetting('notify_lunch_end_time', $('nestNotifyLunchEndTime').value);
+    await setCompanySetting('notify_lunch_end_enabled', $('nestNotifyLunchEndEnabled').checked);
+
+    await setCompanySetting('notify_evening_time', $('nestNotifyEveningTime').value);
+    await setCompanySetting('notify_evening_enabled', $('nestNotifyEveningEnabled').checked);
+
+    alert('Global notification schedule saved successfully.');
+  } catch (err) {
+    alert(`Error saving notification settings: ${err.message}`);
+  } finally {
+    $('saveNotificationsBtn').disabled = false;
+    $('saveNotificationsBtn').textContent = 'Save Notification Settings';
+  }
+});
+
+// Save Invitation Settings
+$('saveInviteSettingsBtn').addEventListener('click', async () => {
+  $('saveInviteSettingsBtn').disabled = true;
+  $('saveInviteSettingsBtn').textContent = 'Saving...';
+  try {
+    await setCompanySetting('invitation_method', $('nestInviteMethod').value);
+    await setCompanySetting('resend_api_key', $('nestResendApiKey').value.trim());
+    await setCompanySetting('resend_sender', $('nestResendSender').value.trim());
+    alert('Invitation delivery settings saved successfully.');
+  } catch (err) {
+    alert(`Error saving invitation settings: ${err.message}`);
+  } finally {
+    $('saveInviteSettingsBtn').disabled = false;
+    $('saveInviteSettingsBtn').textContent = 'Save Invitation Settings';
+  }
+});
+
+// Toggle Resend Inputs view
+$('nestInviteMethod').addEventListener('change', () => {
+  $('resendConfigContainer').style.display = $('nestInviteMethod').value === 'resend' ? 'flex' : 'none';
+});
+
+$('deleteCompanyBtn').addEventListener('click', async () => {
+  const confirmation1 = confirm("⚠️ DANGER ZONE: Are you sure you want to delete this entire company workspace?\n\nThis will permanently delete all employee profiles, logged hours, projects, departments, and configuration data. This CANNOT be undone!");
+  if (!confirmation1) return;
+
+  const confirmation2 = confirm("⚠️ FINAL CONFIRMATION:\n\nAre you absolutely sure? All database rows will be wiped out.");
+  if (!confirmation2) return;
+
+  $('deleteCompanyBtn').disabled = true;
+  $('deleteCompanyBtn').textContent = 'Wiping Database...';
+
+  try {
+    const tables = ['TimeEntries', 'TaskPresets', 'Projects', 'Departments', 'Employees', 'CompanySettings'];
+    for (const tbl of tables) {
+      try {
+        const rows = await dbListAll(tbl);
+        for (const r of rows) {
+          const pk = tbl === 'Employees' ? 'employee_id' : tbl === 'Projects' ? 'project_id' : tbl === 'TaskPresets' ? 'task_id' : tbl === 'Departments' ? 'department_id' : tbl === 'TimeEntries' ? 'entry_id' : 'setting_key';
+          await dbDelete(tbl, pk, r[pk], r._rowNum);
+        }
+      } catch (tblErr) {
+        console.error(`Failed to wipe table ${tbl}:`, tblErr);
+      }
+    }
+    alert('Workspace deleted successfully. The extension will now reload.');
+    await chrome.storage.local.clear();
+    window.location.reload();
+  } catch (err) {
+    alert(`Error during deletion: ${err.message}`);
+  } finally {
+    $('deleteCompanyBtn').disabled = false;
+    $('deleteCompanyBtn').textContent = 'Delete Company Workspace';
   }
 });
 
