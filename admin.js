@@ -13,15 +13,6 @@ let sortAscending = false;
 
 const $ = id => document.getElementById(id);
 
-function getRoachLoaderHtml(text = 'Loading data...') {
-  return `
-    <div class="roach-loader-container">
-      <div class="roach-spinner"></div>
-      <span style="font-size: 12px; font-weight: 500; letter-spacing: 0.05em; color: var(--text-secondary);">${text}</span>
-    </div>
-  `;
-}
-
 const isSheetValueActive = val => {
   if (val === undefined || val === null || val === '') return false;
   if (typeof val === 'boolean') return val;
@@ -1614,8 +1605,8 @@ async function refreshNestTab() {
 }
 
 async function loadNestComplianceData() {
-  $('underTrackedEmployeesList').innerHTML = getRoachLoaderHtml('Calculating compliance...');
-  $('coldProjectsList').innerHTML = getRoachLoaderHtml('Scanning projects...');
+  $('underTrackedEmployeesList').innerHTML = '<span class="status">Loading compliance logs...</span>';
+  $('coldProjectsList').innerHTML = '<span class="status">Loading projects data...</span>';
   try {
     const [emps, projects, entries] = await Promise.all([
       dbListAll('Employees'),
@@ -1810,57 +1801,6 @@ $('deleteCompanyBtn').addEventListener('click', async () => {
   } finally {
     $('deleteCompanyBtn').disabled = false;
     $('deleteCompanyBtn').textContent = 'Delete Company Workspace';
-  }
-});
-
-function triggerRoachScurry(target) {
-  if (!target) return;
-  
-  const computedPos = window.getComputedStyle(target).position;
-  if (computedPos === 'static') {
-    target.style.position = 'relative';
-  }
-  
-  const originalOverflow = target.style.overflow;
-  target.style.overflow = 'visible';
-  
-  const existing = target.querySelector('.click-roach');
-  if (existing) existing.remove();
-  
-  const roach = document.createElement('div');
-  roach.className = 'click-roach';
-  roach.innerHTML = `
-    <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
-      <path d="M30 45 L10 42 M30 55 L5 55 M30 65 L10 70" stroke="#3d2a21" stroke-width="4.5"/>
-      <path d="M70 45 L90 42 M70 55 L95 55 M70 65 L90 70" stroke="#3d2a21" stroke-width="4.5"/>
-      <ellipse cx="50" cy="55" rx="18" ry="25" fill="#5c4033" />
-      <circle cx="50" cy="27" r="10" fill="#3d2a21" />
-      <path class="antenna" d="M47 18 Q33 3 20 13" stroke="#3d2a21" stroke-width="3" fill="none"/>
-      <path class="antenna" d="M53 18 Q67 3 80 13" stroke="#3d2a21" stroke-width="3" fill="none"/>
-      <circle cx="50" cy="55" r="9" fill="#030712" stroke="#38bdf8" stroke-width="2"/>
-      <circle cx="50" cy="55" r="7" fill="#38bdf8" opacity="0.3"/>
-      <line x1="50" y1="55" x2="50" y2="50" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
-      <line x1="50" y1="55" x2="54" y2="55" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-  `;
-  
-  roach.style.left = `calc(50% - 14px)`;
-  roach.style.top = `0px`;
-  target.appendChild(roach);
-  
-  setTimeout(() => {
-    roach.classList.add('fade-out');
-    setTimeout(() => {
-      roach.remove();
-      target.style.overflow = originalOverflow;
-    }, 400);
-  }, 3000);
-}
-
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('button, .tab, .btn-primary, .btn-secondary, .tab-header, .accordion-header');
-  if (btn) {
-    triggerRoachScurry(btn);
   }
 });
 

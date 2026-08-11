@@ -1315,6 +1315,13 @@ document.head.appendChild(spinStyle);
 function triggerRoachScurry(target) {
   if (!target) return;
   
+  // Scurry away any existing cockroaches on the page first
+  document.querySelectorAll('.click-roach').forEach(oldRoach => {
+    oldRoach.classList.add('scurry-away');
+    oldRoach.classList.remove('crawling');
+    setTimeout(() => oldRoach.remove(), 500);
+  });
+  
   const computedPos = window.getComputedStyle(target).position;
   if (computedPos === 'static') {
     target.style.position = 'relative';
@@ -1323,22 +1330,33 @@ function triggerRoachScurry(target) {
   const originalOverflow = target.style.overflow;
   target.style.overflow = 'visible';
   
-  const existing = target.querySelector('.click-roach');
-  if (existing) existing.remove();
-  
   const roach = document.createElement('div');
-  roach.className = 'click-roach';
+  roach.className = 'click-roach crawling';
   roach.innerHTML = `
     <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
-      <path d="M30 45 L10 42 M30 55 L5 55 M30 65 L10 70" stroke="#3d2a21" stroke-width="4.5"/>
-      <path d="M70 45 L90 42 M70 55 L95 55 M70 65 L90 70" stroke="#3d2a21" stroke-width="4.5"/>
-      <ellipse cx="50" cy="55" rx="18" ry="25" fill="#5c4033" />
-      <circle cx="50" cy="27" r="10" fill="#3d2a21" />
-      <path class="antenna" d="M47 18 Q33 3 20 13" stroke="#3d2a21" stroke-width="3" fill="none"/>
-      <path class="antenna" d="M53 18 Q67 3 80 13" stroke="#3d2a21" stroke-width="3" fill="none"/>
-      <circle cx="50" cy="55" r="9" fill="#030712" stroke="#38bdf8" stroke-width="2"/>
-      <circle cx="50" cy="55" r="7" fill="#38bdf8" opacity="0.3"/>
-      <line x1="50" y1="55" x2="50" y2="50" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+      <!-- Legs Group (Left) -->
+      <g class="leg-l">
+        <path d="M30 42 L10 38" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M30 55 L5 55" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M30 68 L10 74" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+      </g>
+      <!-- Legs Group (Right) -->
+      <g class="leg-r">
+        <path d="M70 42 L90 38" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M70 55 L95 55" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M70 68 L90 74" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+      </g>
+      <!-- Body -->
+      <ellipse cx="50" cy="55" rx="18" ry="25" fill="#b45309" stroke="#78350f" stroke-width="2"/>
+      <!-- Head -->
+      <circle cx="50" cy="27" r="10" fill="#78350f"/>
+      <!-- Antennae -->
+      <path class="antenna" d="M47 18 Q33 3 20 13" stroke="#78350f" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path class="antenna" d="M53 18 Q67 3 80 13" stroke="#78350f" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <!-- Glowing stopwatch on back -->
+      <circle cx="50" cy="55" r="9" fill="#020617" stroke="#38bdf8" stroke-width="2.5"/>
+      <circle cx="50" cy="55" r="7" fill="#38bdf8" opacity="0.4"/>
+      <line x1="50" y1="55" x2="50" y2="49" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
       <line x1="50" y1="55" x2="54" y2="55" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
     </svg>
   `;
@@ -1347,13 +1365,10 @@ function triggerRoachScurry(target) {
   roach.style.top = `0px`;
   target.appendChild(roach);
   
+  // After crawling reaches the top (800ms), stop wiggling legs by removing the 'crawling' class
   setTimeout(() => {
-    roach.classList.add('fade-out');
-    setTimeout(() => {
-      roach.remove();
-      target.style.overflow = originalOverflow;
-    }, 400);
-  }, 3000);
+    roach.classList.remove('crawling');
+  }, 800);
 }
 
 document.addEventListener('click', (e) => {

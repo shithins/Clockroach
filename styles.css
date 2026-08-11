@@ -1083,17 +1083,25 @@ body.light-theme .edit-modal {
   z-index: 10000;
   width: 28px;
   height: 28px;
-  animation: roach-scurry 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   transform-origin: bottom center;
+}
+
+/* Scurry up to the top of the container */
+.click-roach.crawling {
+  animation: roach-scurry 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 @keyframes roach-scurry {
   0% {
-    transform: translateY(20px) scale(0.6) rotate(-8deg);
+    transform: translateY(20px) scale(0.5);
     opacity: 0;
   }
-  40% {
-    transform: translateY(5px) scale(1.1) rotate(8deg);
+  30% {
+    transform: translateY(5px) scale(1) rotate(-6deg);
+    opacity: 1;
+  }
+  60% {
+    transform: translateY(-5px) scale(1) rotate(6deg);
     opacity: 1;
   }
   100% {
@@ -1102,27 +1110,48 @@ body.light-theme .edit-modal {
   }
 }
 
+/* Leg crawl wiggling (active only during crawl animation) */
+.click-roach.crawling .leg-l {
+  animation: leg-wiggle-l 0.08s ease-in-out infinite alternate;
+  transform-origin: 30px 55px;
+}
+.click-roach.crawling .leg-r {
+  animation: leg-wiggle-r 0.08s ease-in-out infinite alternate;
+  transform-origin: 70px 55px;
+}
+
+@keyframes leg-wiggle-l {
+  0% { transform: rotate(-12deg); }
+  100% { transform: rotate(12deg); }
+}
+@keyframes leg-wiggle-r {
+  0% { transform: rotate(12deg); }
+  100% { transform: rotate(-12deg); }
+}
+
+/* Antennae always wiggle gently */
 .click-roach .antenna {
-  animation: antenna-wiggle 0.5s ease-in-out infinite alternate;
+  animation: antenna-wiggle 0.7s ease-in-out infinite alternate;
   transform-origin: center bottom;
 }
 
 @keyframes antenna-wiggle {
-  0% { transform: rotate(-10deg); }
-  100% { transform: rotate(10deg); }
+  0% { transform: rotate(-8deg); }
+  100% { transform: rotate(8deg); }
 }
 
-.click-roach.fade-out {
-  animation: roach-fade-away 0.4s ease-in forwards;
+/* Scurry away when dismissed */
+.click-roach.scurry-away {
+  animation: roach-scurry-off 0.5s ease-in forwards;
 }
 
-@keyframes roach-fade-away {
+@keyframes roach-scurry-off {
   0% {
-    transform: translateY(-16px) scale(1);
+    transform: translateY(-16px) scale(1) rotate(0deg);
     opacity: 1;
   }
   100% {
-    transform: translateY(-32px) scale(0.4);
+    transform: translateY(-40px) scale(0.4) rotate(15deg);
     opacity: 0;
   }
 }
