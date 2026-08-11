@@ -205,7 +205,7 @@ async function init() {
 
     currentEmployee = emp;
 
-    // Hide The Nest tab for managers
+    // Hide Pest Control tab for managers
     if (currentEmployee.role !== 'admin') {
       const nestTab = document.querySelector('.tab[data-tab="nest"]');
       if (nestTab) nestTab.style.display = 'none';
@@ -219,7 +219,7 @@ async function init() {
       refreshTasks()
     ]);
 
-    // Initialize accordion item toggles inside The Nest tab
+    // Initialize accordion item toggles inside Pest Control tab
     document.querySelectorAll('.accordion-header').forEach(header => {
       header.addEventListener('click', () => {
         const item = header.closest('.accordion-item');
@@ -548,7 +548,7 @@ $('addEmpBtn').addEventListener('click', async () => {
           const sender = getSettingVal('resend_sender') || 'onboarding@resend.dev';
           
           if (!apiKey) {
-            alert('Resend API key is not configured. Please set it up in "The Nest" tab settings.');
+            alert('Resend API key is not configured. Please set it up in "Pest Control" settings.');
           } else {
             const emailRes = await fetch('https://api.resend.com/emails', {
               method: 'POST',
@@ -1526,7 +1526,7 @@ $('saveEditTaskBtn').addEventListener('click', async () => {
   }
 });
 
-// ---------- THE NEST (SETTINGS & COMPLIANCE) ----------
+// ---------- PEST CONTROL (SETTINGS & COMPLIANCE) ----------
 async function getCompanySetting(settings, key, defaultVal = '') {
   const found = settings.find(s => s.setting_key === key);
   return found ? found.setting_value : defaultVal;
