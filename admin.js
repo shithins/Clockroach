@@ -1171,6 +1171,8 @@ $('tasksTable').querySelector('tbody').addEventListener('click', async (e) => {
   const id = btn.dataset.id;
   if (btn.classList.contains('btn-delete')) {
     await removeTask(id);
+  } else if (btn.classList.contains('btn-edit-task')) {
+    await openEditTaskModal(id);
   }
 });
 
