@@ -243,6 +243,27 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 // ---------- DEPARTMENTS ----------
+function getDepartmentFullPath(depts, dept) {
+  if (!dept.parent_department) {
+    return dept.department_name;
+  }
+  const parent = depts.find(d => String(d.department_name).toLowerCase() === String(dept.parent_department).toLowerCase());
+  if (!parent) {
+    return dept.department_name;
+  }
+  return `${getDepartmentFullPath(depts, parent)} > ${dept.department_name}`;
+}
+
+function getRecursiveChildren(depts, deptName) {
+  const children = [];
+  const direct = depts.filter(d => d.parent_department && String(d.parent_department).toLowerCase() === String(deptName).toLowerCase());
+  direct.forEach(child => {
+    children.push(child.department_name);
+    children.push(...getRecursiveChildren(depts, child.department_name));
+  });
+  return children;
+}
+
 async function refreshDepartments() {
   const depts = await dbListAll('Departments');
   
@@ -252,7 +273,7 @@ async function refreshDepartments() {
       id: d.department_id,
       name: d.department_name,
       parent: d.parent_department || '',
-      displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
+      displayName: getDepartmentFullPath(depts, d)
     };
   }).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
@@ -261,10 +282,8 @@ async function refreshDepartments() {
   $('taskDept').innerHTML = options;
   
   // Also populate the parent selection dropdown inside Departments tab
-  // Note: Only root departments (those without parents) can be selected as parents, to prevent infinite loops!
-  const rootDepts = formattedDepts.filter(d => !d.parent);
   $('deptParent').innerHTML = '<option value="">-- No Parent (Root Department) --</option>' + 
-    rootDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+    formattedDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
 
   const deptCheckboxes = formattedDepts.map(d => `
     <label style="display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; font-weight: normal; text-transform: none;">
@@ -1299,10 +1318,12 @@ async function openEditDeptModal(id) {
   $('editDeptRowIndex').value = matched._rowNum || '';
   $('editDeptName').value = matched.department_name;
 
-  // Populate parents dropdown excluding itself to prevent loops
-  const otherDepts = depts.filter(d => d.department_id !== id && !d.parent_department);
+  // Populate parents dropdown excluding itself and recursive children to prevent infinite loops
+  const forbidden = [matched.department_name.toLowerCase(), ...getRecursiveChildren(depts, matched.department_name).map(n => n.toLowerCase())];
+  const allowedParents = depts.filter(d => !forbidden.includes(d.department_name.toLowerCase()));
+  
   $('editDeptParent').innerHTML = '<option value="">-- No Parent (Root Department) --</option>' +
-    otherDepts.map(d => `<option value="${d.department_name}">${d.department_name}</option>`).join('');
+    allowedParents.map(d => `<option value="${d.department_name}">${getDepartmentFullPath(depts, d)}</option>`).join('');
   
   $('editDeptParent').value = matched.parent_department || '';
   $('editDeptModal').style.display = 'flex';
