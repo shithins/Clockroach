@@ -315,124 +315,165 @@
 
         <!-- THE NEST (SETTINGS) -->
         <div class="tab-content" id="tab-nest">
-          <div class="row" style="align-items: flex-start;">
-            <!-- Left Column: Company settings and notifications -->
-            <div style="flex: 1.2; display: flex; flex-direction: column; gap: 20px;">
-              
-              <div class="card">
-                <h2>Company Details</h2>
-                <div style="margin-bottom: 16px;">
-                  <label>Company / Workspace Name</label>
-                  <input type="text" id="nestCompanyName" placeholder="e.g. Acodez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                </div>
-                <button class="btn-primary" id="saveCompanyNameBtn">Save Company Name</button>
+          <!-- Top Section: Company Performance & Analytics Visualizations -->
+          <div class="row" style="margin-bottom: 20px;">
+            <!-- KPI 1: Total Tracked Hours -->
+            <div class="card" style="flex: 1; margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total Hours Logged (This Week)</span>
+              <h1 id="nestKpiTotalHours" style="font-size: 32px; font-weight: 800; margin: 0; background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0h</h1>
+            </div>
+            <!-- KPI 2: Active Trackers -->
+            <div class="card" style="flex: 1; margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Active Employees Tracking</span>
+              <h1 id="nestKpiActiveEmployees" style="font-size: 32px; font-weight: 800; color: var(--accent-emerald); margin: 0;">0 / 0</h1>
+            </div>
+            <!-- KPI 3: Total Projects -->
+            <div class="card" style="flex: 1; margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Active Tracked Projects</span>
+              <h1 id="nestKpiTotalProjects" style="font-size: 32px; font-weight: 800; color: var(--accent-indigo); margin: 0;">0</h1>
+            </div>
+          </div>
+
+          <div class="row" style="align-items: flex-start; margin-bottom: 24px;">
+            <!-- Compliance -->
+            <div class="card" style="flex: 1; margin-bottom: 0;">
+              <h2>Tracking Compliance</h2>
+              <p class="status" style="margin-bottom: 12px; font-size: 12px;">Active employees with the lowest hours logged this week (target: 20+ hours).</p>
+              <div id="underTrackedEmployeesList" style="display: flex; flex-direction: column; gap: 12px;">
+                <span class="status">Loading compliance logs...</span>
               </div>
-
-              <div class="card">
-                <h2>Employee Invitation Settings</h2>
-                <div style="margin-bottom: 12px;">
-                  <label>Invitation Delivery Method</label>
-                  <select id="nestInviteMethod" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                    <option value="mailto">Default Mail Client (Mailto Link)</option>
-                    <option value="resend">Resend API (Fully Automated Email)</option>
-                  </select>
-                </div>
-                
-                <div id="resendConfigContainer" style="display: none; flex-direction: column; gap: 12px; margin-top: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
-                  <div>
-                    <label>Resend API Key</label>
-                    <input type="password" id="nestResendApiKey" placeholder="re_..." style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                  </div>
-                  <div>
-                    <label>Sender Email Address</label>
-                    <input type="email" id="nestResendSender" placeholder="onboarding@resend.dev" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                    <small style="color: var(--text-secondary); font-size: 11px; display: block; margin-top: 4px;">If using a custom domain, ensure it is verified in your Resend dashboard. Otherwise, use onboarding@resend.dev.</small>
-                  </div>
-                </div>
-                
-                <button class="btn-primary" id="saveInviteSettingsBtn" style="margin-top: 12px;">Save Invitation Settings</button>
-              </div>
-
-              <div class="card">
-                <h2>Global Notification Schedule</h2>
-                <p class="status" style="margin-bottom: 16px; font-size: 12px;">Set the default reminders sent to employee extensions relative to their local timezones.</p>
-                
-                <div style="display: flex; flex-direction: column; gap: 14px;">
-                  <!-- Morning -->
-                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
-                    <div>
-                      <strong style="display: block; font-size: 13px;">Morning Clock-In Reminder</strong>
-                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds offline employees to start their timer.</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <input type="time" id="nestNotifyMorningTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                      <input type="checkbox" id="nestNotifyMorningEnabled" style="width: auto;">
-                    </div>
-                  </div>
-
-                  <!-- Lunch Break Start -->
-                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
-                    <div>
-                      <strong style="display: block; font-size: 13px;">Lunch Break Start</strong>
-                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds tracking employees to pause for lunch break.</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <input type="time" id="nestNotifyLunchStartTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                      <input type="checkbox" id="nestNotifyLunchStartEnabled" style="width: auto;">
-                    </div>
-                  </div>
-
-                  <!-- Lunch Break End -->
-                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
-                    <div>
-                      <strong style="display: block; font-size: 13px;">Lunch Break End</strong>
-                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds offline employees to resume tracking.</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <input type="time" id="nestNotifyLunchEndTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                      <input type="checkbox" id="nestNotifyLunchEndEnabled" style="width: auto;">
-                    </div>
-                  </div>
-
-                  <!-- Evening Stop -->
-                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
-                    <div>
-                      <strong style="display: block; font-size: 13px;">Evening Clock-Out Reminder</strong>
-                      <span style="font-size: 11px; color: var(--text-secondary);">Reminds active employees to stop tracking when leaving.</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <input type="time" id="nestNotifyEveningTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                      <input type="checkbox" id="nestNotifyEveningEnabled" style="width: auto;">
-                    </div>
-                  </div>
-                </div>
-
-                <button class="btn-primary" id="saveNotificationsBtn" style="margin-top: 16px;">Save Notification Settings</button>
-              </div>
-
-              <div class="card" style="border: 1px solid var(--accent-rose); background: rgba(244, 63, 94, 0.02);">
-                <h2 style="color: var(--accent-rose);">Danger Zone</h2>
-                <p class="status" style="margin-bottom: 16px; font-size: 12px; color: var(--text-secondary);">Delete this entire workspace. All logged hours, departments, projects, and employee records will be permanently removed.</p>
-                <button class="btn-primary" id="deleteCompanyBtn" style="background-color: var(--accent-rose); border-color: var(--accent-rose); font-weight: 600;">Delete Company Workspace</button>
-              </div>
-
             </div>
 
-            <!-- Right Column: Audits and Compliance -->
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
-              <div class="card">
-                <h2>Tracking Compliance</h2>
-                <p class="status" style="margin-bottom: 12px; font-size: 12px;">Active employees with the lowest hours logged this week (target: 20+ hours).</p>
-                <div id="underTrackedEmployeesList" style="display: flex; flex-direction: column; gap: 10px;">
-                  <span class="status">Loading compliance logs...</span>
+            <!-- Cold Projects -->
+            <div class="card" style="flex: 1; margin-bottom: 0;">
+              <h2>Cold Projects (Stagnant)</h2>
+              <p class="status" style="margin-bottom: 12px; font-size: 12px;">Projects with the lowest or zero tracked hours recently.</p>
+              <div id="coldProjectsList" style="display: flex; flex-direction: column; gap: 10px;">
+                <span class="status">Loading projects data...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Section: Accordion for Setup / Configurations -->
+          <div style="margin-top: 32px;">
+            <h2 style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Workspace Configuration & Settings</h2>
+            
+            <div class="accordion">
+              <!-- Item 1: Company Profile & Invites -->
+              <div class="accordion-item">
+                <div class="accordion-header">
+                  <span>Company Details & Invites Settings</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="accordion-body">
+                  <div class="row" style="align-items: flex-start; gap: 20px; margin-bottom: 0;">
+                    <div style="flex: 1;">
+                      <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Company Info</h3>
+                      <div style="margin-bottom: 12px;">
+                        <label>Company / Workspace Name</label>
+                        <input type="text" id="nestCompanyName" placeholder="e.g. Acodez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                      </div>
+                      <button class="btn-primary" id="saveCompanyNameBtn">Save Company Name</button>
+                    </div>
+
+                    <div style="flex: 1; border-left: 1px solid var(--border-color); padding-left: 20px;">
+                      <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Employee Invitation Delivery</h3>
+                      <div style="margin-bottom: 12px;">
+                        <label>Invitation Delivery Method</label>
+                        <select id="nestInviteMethod" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                          <option value="mailto">Default Mail Client (Mailto Link)</option>
+                          <option value="resend">Resend API (Fully Automated Email)</option>
+                        </select>
+                      </div>
+                      
+                      <div id="resendConfigContainer" style="display: none; flex-direction: column; gap: 12px; margin-top: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                        <div>
+                          <label>Resend API Key</label>
+                          <input type="password" id="nestResendApiKey" placeholder="re_..." style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                        </div>
+                        <div>
+                          <label>Sender Email Address</label>
+                          <input type="email" id="nestResendSender" placeholder="onboarding@resend.dev" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                          <small style="color: var(--text-secondary); font-size: 11px; display: block; margin-top: 4px;">If using a custom domain, ensure it is verified in your Resend dashboard. Otherwise, use onboarding@resend.dev.</small>
+                        </div>
+                      </div>
+                      
+                      <button class="btn-primary" id="saveInviteSettingsBtn" style="margin-top: 12px;">Save Invitation Settings</button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div class="card">
-                <h2>Cold Projects (Stagnant)</h2>
-                <p class="status" style="margin-bottom: 12px; font-size: 12px;">Projects with the lowest or zero tracked hours recently.</p>
-                <div id="coldProjectsList" style="display: flex; flex-direction: column; gap: 10px;">
-                  <span class="status">Loading projects data...</span>
+              <!-- Item 2: Notifications Schedule -->
+              <div class="accordion-item">
+                <div class="accordion-header">
+                  <span>Global Notification Schedule</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="accordion-body">
+                  <p class="status" style="margin-bottom: 16px; font-size: 12px;">Set the default reminders sent to employee extensions relative to their local timezones.</p>
+                  <div style="display: flex; flex-direction: column; gap: 14px; max-width: 600px;">
+                    <!-- Morning -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                      <div>
+                        <strong style="display: block; font-size: 13px;">Morning Clock-In Reminder</strong>
+                        <span style="font-size: 11px; color: var(--text-secondary);">Reminds offline employees to start their timer.</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="time" id="nestNotifyMorningTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                        <input type="checkbox" id="nestNotifyMorningEnabled" style="width: auto;">
+                      </div>
+                    </div>
+
+                    <!-- Lunch Break Start -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                      <div>
+                        <strong style="display: block; font-size: 13px;">Lunch Break Start</strong>
+                        <span style="font-size: 11px; color: var(--text-secondary);">Reminds tracking employees to pause for lunch break.</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="time" id="nestNotifyLunchStartTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                        <input type="checkbox" id="nestNotifyLunchStartEnabled" style="width: auto;">
+                      </div>
+                    </div>
+
+                    <!-- Lunch Break End -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                      <div>
+                        <strong style="display: block; font-size: 13px;">Lunch Break End</strong>
+                        <span style="font-size: 11px; color: var(--text-secondary);">Reminds offline employees to resume tracking.</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="time" id="nestNotifyLunchEndTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                        <input type="checkbox" id="nestNotifyLunchEndEnabled" style="width: auto;">
+                      </div>
+                    </div>
+
+                    <!-- Evening Stop -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                      <div>
+                        <strong style="display: block; font-size: 13px;">Evening Clock-Out Reminder</strong>
+                        <span style="font-size: 11px; color: var(--text-secondary);">Reminds active employees to stop tracking when leaving.</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="time" id="nestNotifyEveningTime" style="width: 100px; padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                        <input type="checkbox" id="nestNotifyEveningEnabled" style="width: auto;">
+                      </div>
+                    </div>
+                  </div>
+                  <button class="btn-primary" id="saveNotificationsBtn" style="margin-top: 16px;">Save Notification Settings</button>
+                </div>
+              </div>
+
+              <!-- Item 3: System Security & Danger Zone -->
+              <div class="accordion-item">
+                <div class="accordion-header" style="color: var(--accent-rose);">
+                  <span>Danger Zone (Delete Workspace)</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-rose)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="accordion-body" style="background: rgba(244, 63, 94, 0.01);">
+                  <p class="status" style="margin-bottom: 16px; font-size: 12px; color: var(--text-secondary);">Delete this entire workspace. All logged hours, departments, projects, and employee records will be permanently removed.</p>
+                  <button class="btn-primary" id="deleteCompanyBtn" style="background-color: var(--accent-rose); border-color: var(--accent-rose); font-weight: 600;">Delete Company Workspace</button>
                 </div>
               </div>
             </div>

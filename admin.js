@@ -219,6 +219,18 @@ async function init() {
       refreshTasks()
     ]);
 
+    // Initialize accordion item toggles inside The Nest tab
+    document.querySelectorAll('.accordion-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const item = header.closest('.accordion-item');
+        const isActive = item.classList.contains('active');
+        document.querySelectorAll('.accordion-item').forEach(i => i.classList.remove('active'));
+        if (!isActive) {
+          item.classList.add('active');
+        }
+      });
+    });
+
     await populateFilterDropdowns();
   } catch (err) {
     alert(`Failed to load Admin Dashboard: ${err.message}`);
@@ -1592,6 +1604,20 @@ async function loadNestComplianceData() {
     startOfWeek.setHours(0, 0, 0, 0);
 
     const thisWeeksEntries = entries.filter(e => new Date(e.start_time) >= startOfWeek && e.end_time);
+
+    // Calculate and populate Nest KPIs
+    const totalWeeklyMinutes = thisWeeksEntries.reduce((sum, e) => sum + Number(e.duration_minutes || 0), 0);
+    const totalWeeklyHours = Math.round((totalWeeklyMinutes / 60) * 10) / 10;
+    $('nestKpiTotalHours').textContent = `${totalWeeklyHours}h`;
+
+    const activeTrackingEntries = entries.filter(e => !e.end_time);
+    const activeTrackingEmails = new Set(activeTrackingEntries.map(e => String(e.employee_email).toLowerCase()));
+    const totalActiveStaff = emps.filter(e => isSheetValueActive(e.active) && e.role !== 'admin');
+    const trackingCount = totalActiveStaff.filter(e => activeTrackingEmails.has(e.email.toLowerCase())).length;
+    $('nestKpiActiveEmployees').textContent = `${trackingCount} / ${totalActiveStaff.length}`;
+
+    const activeProjectsCount = projects.filter(p => isSheetValueActive(p.active)).length;
+    $('nestKpiTotalProjects').textContent = activeProjectsCount;
 
     const empHours = {};
     emps.forEach(e => {
