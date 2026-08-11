@@ -535,7 +535,8 @@ $('addEmpBtn').addEventListener('click', async () => {
             `Hello ${name},\n\n` +
             `You have been invited to join our Clockroach workspace as a ${role}.\n\n` +
             `To get started:\n` +
-            `1. Install the Clockroach Chrome Extension.\n` +
+            `1. Install the Clockroach Chrome Extension here:\n` +
+            `https://chromewebstore.google.com/detail/clockroach/acnlacpclalmgflndfbgmnfdlgbgeeja\n\n` +
             `2. Connect using this Workspace Invite Code:\n` +
             `${inviteCode}\n\n` +
             `3. Sign up using your email: ${email}\n\n` +
@@ -567,7 +568,7 @@ $('addEmpBtn').addEventListener('click', async () => {
                     <p>You have been invited to join our Clockroach workspace as a <strong>${role}</strong>.</p>
                     <p>To get started, follow these simple steps:</p>
                     <ol style="line-height: 1.6;">
-                      <li>Install the Clockroach Chrome Extension.</li>
+                      <li>Install the <a href="https://chromewebstore.google.com/detail/clockroach/acnlacpclalmgflndfbgmnfdlgbgeeja" style="color: #6366f1; font-weight: 600; text-decoration: underline;">Clockroach Chrome Extension</a>.</li>
                       <li>When prompted, paste this Workspace Invitation Code:
                         <div style="background: #f1f5f9; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 11px; word-break: break-all; margin: 8px 0; border: 1px solid #cbd5e1;">
                           ${inviteCode}

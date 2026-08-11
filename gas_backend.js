@@ -100,7 +100,8 @@ function insertRow(sheet, data) {
         const body = "Hello " + name + ",\n\n" +
                      "You have been invited to join the Clockroach workspace as a " + role + ".\n\n" +
                      "To get started:\n" +
-                     "1. Install the Clockroach Chrome Extension.\n" +
+                     "1. Install the Clockroach Chrome Extension here:\n" +
+                     "https://chromewebstore.google.com/detail/clockroach/acnlacpclalmgflndfbgmnfdlgbgeeja\n\n" +
                      "2. Connect using this Workspace Invite Code (Google Web App URL):\n" +
                      webAppUrl + "\n\n" +
                      "3. Sign up using your email: " + email + "\n\n" +
