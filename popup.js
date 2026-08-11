@@ -1333,36 +1333,56 @@ function triggerRoachScurry(target) {
   const roach = document.createElement('div');
   roach.className = 'click-roach crawling';
   roach.innerHTML = `
-    <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+    <svg viewBox="0 0 100 120" style="width: 100%; height: 100%;">
       <!-- Legs Group (Left) -->
       <g class="leg-l">
-        <path d="M30 42 L10 38" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
-        <path d="M30 55 L5 55" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
-        <path d="M30 68 L10 74" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M32 72 Q15 68 8 72" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
+        <path d="M32 80 Q10 80 5 84" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
+        <path d="M32 88 Q15 92 10 100" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
       </g>
       <!-- Legs Group (Right) -->
       <g class="leg-r">
-        <path d="M70 42 L90 38" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
-        <path d="M70 55 L95 55" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
-        <path d="M70 68 L90 74" stroke="#d97706" stroke-width="5.5" stroke-linecap="round"/>
+        <path d="M68 72 Q85 68 92 72" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
+        <path d="M68 80 Q90 80 95 84" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
+        <path d="M68 88 Q85 92 90 100" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
       </g>
-      <!-- Body -->
-      <ellipse cx="50" cy="55" rx="18" ry="25" fill="#b45309" stroke="#78350f" stroke-width="2"/>
+      <!-- Body Shell -->
+      <ellipse cx="50" cy="80" rx="18" ry="24" fill="#b45309" stroke="#78350f" stroke-width="2"/>
+      <!-- Shell Segments -->
+      <path d="M34 68 Q50 72 66 68 M32 78 Q50 82 68 78 M33 88 Q50 92 67 88" stroke="#78350f" stroke-width="2" fill="none"/>
+      <!-- Arms holding the clock above head -->
+      <path d="M38 70 Q30 40 38 18" stroke="#78350f" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M62 70 Q70 40 62 18" stroke="#78350f" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <!-- Claw Gripping -->
+      <path d="M36 18 Q35 15 38 14" stroke="#78350f" stroke-width="2" fill="none"/>
+      <path d="M64 18 Q65 15 62 14" stroke="#78350f" stroke-width="2" fill="none"/>
       <!-- Head -->
-      <circle cx="50" cy="27" r="10" fill="#78350f"/>
+      <circle cx="50" cy="46" r="10" fill="#78350f"/>
+      <!-- Goofy Smile Mouth -->
+      <path d="M44 48 Q50 54 56 48" stroke="#ffffff" stroke-width="2" fill="none"/>
+      <path d="M46 50 Q50 54 54 50" fill="#ef4444"/>
+      <!-- Goofy Eyes -->
+      <circle cx="44" cy="40" r="4.5" fill="#ffffff" stroke="#78350f" stroke-width="1"/>
+      <circle cx="56" cy="40" r="4.5" fill="#ffffff" stroke="#78350f" stroke-width="1"/>
+      <circle cx="45" cy="39" r="1.8" fill="#000000"/>
+      <circle cx="55" cy="39" r="1.8" fill="#000000"/>
       <!-- Antennae -->
-      <path class="antenna" d="M47 18 Q33 3 20 13" stroke="#78350f" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <path class="antenna" d="M53 18 Q67 3 80 13" stroke="#78350f" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <!-- Glowing stopwatch on back -->
-      <circle cx="50" cy="55" r="9" fill="#020617" stroke="#38bdf8" stroke-width="2.5"/>
-      <circle cx="50" cy="55" r="7" fill="#38bdf8" opacity="0.4"/>
-      <line x1="50" y1="55" x2="50" y2="49" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
-      <line x1="50" y1="55" x2="54" y2="55" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+      <path class="antenna" d="M42 38 Q25 22 10 32" stroke="#78350f" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path class="antenna" d="M58 38 Q75 22 90 32" stroke="#78350f" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <!-- Wall Clock held high -->
+      <circle cx="50" cy="20" r="16" fill="#1e293b" stroke="#38bdf8" stroke-width="2.5"/>
+      <circle cx="50" cy="20" r="12" fill="#ffffff"/>
+      <!-- Clock Ticks -->
+      <line x1="50" y1="8" x2="50" y2="10" stroke="#000" stroke-width="1.5"/>
+      <line x1="50" y1="30" x2="50" y2="32" stroke="#000" stroke-width="1.5"/>
+      <line x1="38" y1="20" x2="40" y2="20" stroke="#000" stroke-width="1.5"/>
+      <line x1="60" y1="20" x2="62" y2="20" stroke="#000" stroke-width="1.5"/>
+      <!-- Clock Hands (10:10) -->
+      <line x1="50" y1="20" x2="44" y2="14" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+      <line x1="50" y1="20" x2="59" y2="14" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>
     </svg>
   `;
   
-  roach.style.left = `calc(50% - 14px)`;
-  roach.style.top = `0px`;
   target.appendChild(roach);
   
   // After crawling reaches the top (800ms), stop wiggling legs by removing the 'crawling' class
@@ -1372,9 +1392,9 @@ function triggerRoachScurry(target) {
 }
 
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest('button, .tab, .btn-primary, .btn-secondary, #toggleBtn');
-  if (btn) {
-    triggerRoachScurry(btn);
+  const ctrl = e.target.closest('button, .tab, select, input, .entry-card, .btn-icon, .timer-button, #toggleBtn');
+  if (ctrl) {
+    triggerRoachScurry(ctrl);
   }
 });
 

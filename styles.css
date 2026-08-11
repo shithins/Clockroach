@@ -1081,8 +1081,11 @@ body.light-theme .edit-modal {
   position: absolute;
   pointer-events: none;
   z-index: 10000;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 48px;
+  bottom: calc(100% - 4px);
+  left: 50%;
+  transform: translate(-50%, 0);
   transform-origin: bottom center;
 }
 
@@ -1093,19 +1096,19 @@ body.light-theme .edit-modal {
 
 @keyframes roach-scurry {
   0% {
-    transform: translateY(20px) scale(0.5);
+    transform: translate(-50%, 28px) scale(0.5);
     opacity: 0;
   }
   30% {
-    transform: translateY(5px) scale(1) rotate(-6deg);
+    transform: translate(-50%, 15px) scale(1) rotate(-6deg);
     opacity: 1;
   }
   60% {
-    transform: translateY(-5px) scale(1) rotate(6deg);
+    transform: translate(-50%, 5px) scale(1) rotate(6deg);
     opacity: 1;
   }
   100% {
-    transform: translateY(-16px) scale(1) rotate(0deg);
+    transform: translate(-50%, 0) scale(1) rotate(0deg);
     opacity: 1;
   }
 }
@@ -1113,11 +1116,11 @@ body.light-theme .edit-modal {
 /* Leg crawl wiggling (active only during crawl animation) */
 .click-roach.crawling .leg-l {
   animation: leg-wiggle-l 0.08s ease-in-out infinite alternate;
-  transform-origin: 30px 55px;
+  transform-origin: 32px 80px;
 }
 .click-roach.crawling .leg-r {
   animation: leg-wiggle-r 0.08s ease-in-out infinite alternate;
-  transform-origin: 70px 55px;
+  transform-origin: 68px 80px;
 }
 
 @keyframes leg-wiggle-l {
@@ -1147,11 +1150,11 @@ body.light-theme .edit-modal {
 
 @keyframes roach-scurry-off {
   0% {
-    transform: translateY(-16px) scale(1) rotate(0deg);
+    transform: translate(-50%, 0) scale(1) rotate(0deg);
     opacity: 1;
   }
   100% {
-    transform: translateY(-40px) scale(0.4) rotate(15deg);
+    transform: translate(-50%, -24px) scale(0.4) rotate(15deg);
     opacity: 0;
   }
 }
