@@ -1076,3 +1076,90 @@ body.light-theme .edit-modal {
   display: block;
 }
 
+/* Click Roach Animation */
+.click-roach {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10000;
+  width: 28px;
+  height: 28px;
+  animation: roach-scurry 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  transform-origin: bottom center;
+}
+
+@keyframes roach-scurry {
+  0% {
+    transform: translateY(20px) scale(0.6) rotate(-8deg);
+    opacity: 0;
+  }
+  40% {
+    transform: translateY(5px) scale(1.1) rotate(8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-16px) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.click-roach .antenna {
+  animation: antenna-wiggle 0.5s ease-in-out infinite alternate;
+  transform-origin: center bottom;
+}
+
+@keyframes antenna-wiggle {
+  0% { transform: rotate(-10deg); }
+  100% { transform: rotate(10deg); }
+}
+
+.click-roach.fade-out {
+  animation: roach-fade-away 0.4s ease-in forwards;
+}
+
+@keyframes roach-fade-away {
+  0% {
+    transform: translateY(-16px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-32px) scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* Roach Circular Loading Spinner */
+.roach-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+.roach-spinner {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border: 2px dashed rgba(99, 102, 241, 0.2);
+  border-radius: 50%;
+  animation: spin-dashed 6s linear infinite;
+}
+
+@keyframes spin-dashed {
+  100% { transform: rotate(360deg); }
+}
+
+.roach-spinner::after {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: calc(50% - 9px);
+  width: 18px;
+  height: 18px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%236366f1"><ellipse cx="50" cy="55" rx="18" ry="25" fill="%236366f1" /><circle cx="50" cy="27" r="10" fill="%234f46e5" /><path d="M47 18 Q35 5 25 15" stroke="%234f46e5" stroke-width="3" fill="none"/><path d="M53 18 Q65 5 75 15" stroke="%234f46e5" stroke-width="3" fill="none"/><path d="M30 45 L10 42 M30 55 L5 55 M30 65 L10 70" stroke="%234f46e5" stroke-width="4"/><path d="M70 45 L90 42 M70 55 L95 55 M70 65 L90 70" stroke="%234f46e5" stroke-width="4"/></svg>');
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
