@@ -289,27 +289,27 @@ async function refreshDepartments() {
     };
   }).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-  const options = formattedDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
+  let filteredDepts = formattedDepts;
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    filteredDepts = formattedDepts.filter(d => d.name.toLowerCase() === mgrDept);
+  }
+
+  const options = filteredDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
   $('empDept').innerHTML = options;
   $('taskDept').innerHTML = options;
   
   // Also populate the parent selection dropdown inside Departments tab
   $('deptParent').innerHTML = '<option value="">-- No Parent (Root Department) --</option>' + 
-    formattedDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
+    filteredDepts.map(d => `<option value="${d.name}">${d.displayName}</option>`).join('');
 
-  const deptCheckboxes = formattedDepts.map(d => `
+  const deptCheckboxes = filteredDepts.map(d => `
     <label style="display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 13px; font-weight: normal; text-transform: none;">
       <input type="checkbox" name="projDeptCheck" value="${d.name}" style="width: auto;">
       <span>${d.displayName}</span>
     </label>
   `).join('');
   $('projDeptsContainer').innerHTML = deptCheckboxes || '<span class="status">No departments available</span>';
-
-  let filteredDepts = formattedDepts;
-  if (currentEmployee && currentEmployee.role === 'manager') {
-    const mgrDept = String(currentEmployee.department).toLowerCase();
-    filteredDepts = formattedDepts.filter(d => d.name.toLowerCase() === mgrDept);
-  }
 
   $('departmentsTable').querySelector('tbody').innerHTML = filteredDepts.map(d => `
     <tr>
@@ -1220,7 +1220,12 @@ async function openEditEmpModal(id) {
   
   // Populate departments select dropdown in the modal
   const depts = await dbListAll('Departments');
-  const formattedDepts = depts.map(d => {
+  let filteredDepts = depts;
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    filteredDepts = depts.filter(d => d.department_name.toLowerCase() === mgrDept);
+  }
+  const formattedDepts = filteredDepts.map(d => {
     return {
       name: d.department_name,
       displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
@@ -1393,7 +1398,12 @@ async function openEditProjModal(id) {
 
   // Render department checkboxes in project edit modal
   const depts = await dbListAll('Departments');
-  const formattedDepts = depts.map(d => {
+  let filteredDepts = depts;
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    filteredDepts = depts.filter(d => d.department_name.toLowerCase() === mgrDept);
+  }
+  const formattedDepts = filteredDepts.map(d => {
     return {
       name: d.department_name,
       displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
@@ -1473,7 +1483,12 @@ async function openEditTaskModal(id) {
 
   // Populate departments dropdown
   const depts = await dbListAll('Departments');
-  const formattedDepts = depts.map(d => {
+  let filteredDepts = depts;
+  if (currentEmployee && currentEmployee.role === 'manager') {
+    const mgrDept = String(currentEmployee.department).toLowerCase();
+    filteredDepts = depts.filter(d => d.department_name.toLowerCase() === mgrDept);
+  }
+  const formattedDepts = filteredDepts.map(d => {
     return {
       name: d.department_name,
       displayName: d.parent_department ? `${d.parent_department} - ${d.department_name}` : d.department_name
